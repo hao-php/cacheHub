@@ -30,6 +30,11 @@ class CacheEngine
         $this->logger = $logger;
     }
 
+    /**
+     * 获取驱动实例（带缓存）
+     * @param CacheLevel $level 缓存层级配置
+     * @return AbstractDriver
+     */
     protected function getDriver(CacheLevel $level): AbstractDriver
     {
         $class = $level->driver;
@@ -44,6 +49,11 @@ class CacheEngine
         return $this->driverObjs[$class];
     }
 
+    /**
+     * 获取序列化器实例（带缓存）
+     * @param string $class 序列化器类名
+     * @return SerializerInterface
+     */
     protected function getSerializer($class): SerializerInterface
     {
         if (!isset($this->serializerObjs[$class])) {
@@ -56,6 +66,7 @@ class CacheEngine
     }
 
     /**
+     * 校验缓存层级配置：不能为空，不能有重复的 driver
      * @param CacheLevel[] $levels
      */
     protected function validateLevels(array $levels): void
@@ -69,6 +80,10 @@ class CacheEngine
         }
     }
 
+    /**
+     * 获取缓存 key，为空时抛出异常
+     * @return string
+     */
     protected function getKey(AbstractMultiCache $cache): string
     {
         if (empty($cache->key)) {
@@ -77,6 +92,13 @@ class CacheEngine
         return $cache->key;
     }
 
+    /**
+     * 构建分布式锁的 key
+     * @param string $prefix key 前缀
+     * @param string $key 缓存 key
+     * @param mixed $keyParams key 参数
+     * @return string
+     */
     protected function buildLockKey($prefix, $key, $keyParams): string
     {
         $str = '';
@@ -93,6 +115,12 @@ class CacheEngine
         return $key . '_lock';
     }
 
+    /**
+     * 校验缓存数据的版本号，版本不匹配则视为未命中
+     * @param AbstractMultiCache $cache
+     * @param mixed &$data 校验通过后会剥离版本包装，只保留原始数据
+     * @return bool
+     */
     protected function checkDataVersion(AbstractMultiCache $cache, &$data)
     {
         if (!$cache->addVersion) {
@@ -105,6 +133,12 @@ class CacheEngine
         return false;
     }
 
+    /**
+     * 给数据包装版本号
+     * @param AbstractMultiCache $cache
+     * @param mixed $data 原始数据
+     * @return mixed 包装后的数据，或未开启版本时返回原数据
+     */
     protected function addDataVersion(AbstractMultiCache $cache, $data)
     {
         if (!$cache->addVersion) {
@@ -116,7 +150,11 @@ class CacheEngine
         ];
     }
 
-    protected function cacheEmptyValue(AbstractMultiCache $cache, AbstractDriver $driver, $key, $nullTtl)
+    /**
+     * 将空值标记（nullValue）写入缓存，防止缓存穿透
+     * @return bool
+     */
+    protected function cacheNullValue(AbstractMultiCache $cache, AbstractDriver $driver, $key, $nullTtl)
     {
         if (!$cache->isCacheNull) {
             return true;
@@ -128,32 +166,45 @@ class CacheEngine
         return (bool)$driver->set($key, $cache->nullValue, $nullTtl);
     }
 
-    protected function checkEmptyValue(AbstractMultiCache $cache, $value)
+    /**
+     * 判断缓存值是否为空值标记（nullValue）
+     * @param AbstractMultiCache $cache
+     * @param mixed $value 从缓存取出的值
+     * @return bool
+     */
+    protected function isNullValue(AbstractMultiCache $cache, $value)
     {
-        if ($value === $cache->nullValue) {
-            return true;
-        }
-        return false;
+        return $value === $cache->nullValue;
     }
 
-    protected function parseCacheData(AbstractMultiCache $cache, $data)
+    /**
+     * 解析缓存数据，判定命中状态
+     * @param AbstractMultiCache $cache
+     * @param mixed $data 从缓存取出的原始数据
+     * @return array{0: bool, 1: mixed} [是否命中, 解析后的数据]
+     */
+    protected function resolveCacheData(AbstractMultiCache $cache, $data)
     {
         if (!Utils::checkEmpty($data) && $data !== '' && $this->checkDataVersion($cache, $data)) {
             return [true, $data];
         }
 
-        if ($this->checkEmptyValue($cache, $data)) {
+        if ($this->isNullValue($cache, $data)) {
             return [true, null];
         }
 
         return [false, null];
     }
 
+    /**
+     * 将 build 结果写入缓存，空数据则写入空值标记
+     * @return bool
+     */
     protected function setBuildData(AbstractMultiCache $cache, AbstractDriver $driver, $key, $data, $ttl, $nullTtl)
     {
         if ($data === '' || Utils::checkEmpty($data)) {
             $data = null;
-            return $this->cacheEmptyValue($cache, $driver, $key, $nullTtl);
+            return $this->cacheNullValue($cache, $driver, $key, $nullTtl);
         }
 
         $ttl = intval($ttl);
@@ -164,6 +215,10 @@ class CacheEngine
         return (bool)$driver->set($key, $data, $ttl);
     }
 
+    /**
+     * 加锁场景下尝试获取缓存数据：获取锁则放行 build，未获取锁则等待其他进程写入
+     * @return array{0: bool, 1: mixed} [是否命中, 数据]
+     */
     protected function lockGetData(AbstractMultiCache $cache, AbstractDriver $driver, $key, $keyParams, &$stack): array
     {
         if (!$cache->buildLock || empty($cache->buildWaitCount) || $cache->buildWaitCount <= 0) {
@@ -184,7 +239,7 @@ class CacheEngine
 
         for ($i = 0; $i < $cache->buildWaitCount; $i++) {
             $data = $driver->get($key);
-            list($parseRet, $data) = $this->parseCacheData($cache, $data);
+            list($parseRet, $data) = $this->resolveCacheData($cache, $data);
             if ($parseRet) {
                 return [true, $data];
             }
@@ -223,7 +278,7 @@ class CacheEngine
                 $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
 
                 $data = $driver->get($key);
-                list($get, $data) = $this->parseCacheData($cache, $data);
+                list($get, $data) = $this->resolveCacheData($cache, $data);
                 if ($get) {
                     $dataFrom = $level->driver;
                     break;
@@ -312,7 +367,7 @@ class CacheEngine
             $dataArr = $driver->multiGet($keyArr);
             $emptyKeyArr = [];
             foreach ($dataArr as $dKey => $value) {
-                list($get, $value) = $this->parseCacheData($cache, $value);
+                list($get, $value) = $this->resolveCacheData($cache, $value);
                 if (!$get) {
                     $keyParamsArrTmp[] = $keyMap[$dKey];
                     $emptyKeyArr[$dKey] = $keyMap[$dKey];

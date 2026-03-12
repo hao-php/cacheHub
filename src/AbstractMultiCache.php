@@ -9,7 +9,7 @@ abstract class AbstractMultiCache
     /** 缓存key */
     public $key = '';
 
-    /** 当数据为空时存的值 */
+    /** 空值标记，build() 返回空数据时写入缓存的哨兵值。注意：不要将此值作为正常业务数据 */
     public $nullValue = '';
 
     /** 是否缓存空值 */
