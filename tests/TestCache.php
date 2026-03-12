@@ -2,13 +2,13 @@
 declare(strict_types=1);
 
 
-use Haoa\CacheHub\CacheHandler;
+use Haoa\CacheHub\AbstractMultiCache;
 use Haoa\CacheHub\Driver\ApcuDriver;
 use Haoa\CacheHub\Driver\RedisDriver;
 use Haoa\CacheHub\Serializer\JsonSerializer;
 use Haoa\CacheHub\Serializer\OriginalSerializer;
 
-class TestCache extends CacheHandler
+class TestCache extends AbstractMultiCache
 {
 
     public $key = 'test';
@@ -37,15 +37,9 @@ class TestCache extends CacheHandler
         return call_user_func($this->wrapFunc, $data);
     }
 
-    protected function getCacheList(): array
+    public function getCacheList(): array
     {
         return [
-            // [
-            //     'driver' => ApcuDriver::class,
-            //     'serializer' => OriginalSerializer::class, // default
-            //     'null_ttl' => 5,
-            //     'ttl' => 5,
-            // ],
             [
                 'driver' => RedisDriver::class,
                 'driver_handler' => new RedisPool(),
@@ -57,7 +51,7 @@ class TestCache extends CacheHandler
     }
 }
 
-class TestCache2 extends CacheHandler
+class TestCache2 extends AbstractMultiCache
 {
 
     public $key = 'test';
@@ -93,7 +87,7 @@ class TestCache2 extends CacheHandler
         return call_user_func($this->multiBuildFunc, $params);
     }
 
-    protected function getCacheList(): array
+    public function getCacheList(): array
     {
         return [
             [
@@ -113,7 +107,7 @@ class TestCache2 extends CacheHandler
     }
 }
 
-class TestRepeatedCache extends CacheHandler
+class TestRepeatedCache extends AbstractMultiCache
 {
 
     public $key = 'test';
@@ -121,7 +115,7 @@ class TestRepeatedCache extends CacheHandler
     public $nullValue = '';
     public $valueFunc;
 
-    protected function getCacheList(): array
+    public function getCacheList(): array
     {
         return [
             [

@@ -1,6 +1,6 @@
 <?php
 
-use Haoa\CacheHub\CacheHandler;
+use Haoa\CacheHub\AbstractMultiCache;
 use Haoa\CacheHub\CacheHub;
 use Haoa\CacheHub\Driver\ApcuDriver;
 use Haoa\CacheHub\Driver\RedisDriver as RedisDriver;
@@ -25,7 +25,7 @@ class Logger implements \Haoa\CacheHub\LoggerInterface
     }
 }
 
-class ExTest extends CacheHandler
+class ExTest extends AbstractMultiCache
 {
 
     public $key = "ex_test";
@@ -33,7 +33,7 @@ class ExTest extends CacheHandler
 
     public $isCacheNull = true;
 
-    protected function getCacheList(): array
+    public function getCacheList(): array
     {
         $redis = new \Redis();
         $redis->connect('redis');
@@ -57,13 +57,13 @@ class ExTest extends CacheHandler
     /**
      * 生成数据
      */
-    protected function build($params)
+    public function build($params)
     {
         return '';
         // return 'ex_data';
     }
 
-    protected function multiBuild(array $params): array
+    public function multiBuild(array $params): array
     {
         $data = [];
         foreach ($params as $key) {
@@ -75,7 +75,7 @@ class ExTest extends CacheHandler
     /**
      * 包装数据
      */
-    protected function wrapData($data)
+    public function wrapData($data)
     {
         return $data;
     }

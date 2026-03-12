@@ -5,7 +5,6 @@ namespace Haoa\CacheHub;
 
 use Haoa\CacheHub\Exception\Exception;
 use Haoa\CacheHub\Locker\Locker;
-use Haoa\CacheHub\Serializer\SerializerInterface;
 
 class CacheHub
 {
@@ -14,7 +13,7 @@ class CacheHub
 
     const DEFAULT_NULL_TTL = 60;
 
-    /** 缓存类对象 */
+    /** @var CacheProxy[] */
     protected $cacheObjs = [];
 
     /** @var Locker 用于构建缓存时的锁 */
@@ -22,14 +21,10 @@ class CacheHub
 
     protected Container $container;
 
-    /**
-     * 缓存的key
-     * @var array
-     */
-    protected $keys = [];
-
     /** 缓存前缀 */
     protected $prefix = 'cachehub:';
+
+    private ?CacheEngine $engine = null;
 
 
     public function __construct()
@@ -51,11 +46,13 @@ class CacheHub
     public function setPrefix(string $prefix): void
     {
         $this->prefix = $prefix;
+        $this->engine = null;
     }
 
     public function setLocker(Locker $locker)
     {
         $this->locker = $locker;
+        $this->engine = null;
     }
 
     public function setLogger(LoggerInterface $logger)
@@ -63,21 +60,26 @@ class CacheHub
         $this->container->setLogger($logger);
     }
 
-    public function getCache(string $cacheClass, bool $isNew = false): CacheHandler
+    protected function getEngine(): CacheEngine
+    {
+        if ($this->engine === null) {
+            $this->engine = new CacheEngine($this->container, $this->locker, $this->prefix);
+        }
+        return $this->engine;
+    }
+
+    public function getCache(string $cacheClass, bool $isNew = false): CacheProxy
     {
         if (!$isNew && isset($this->cacheObjs[$cacheClass])) {
             return $this->cacheObjs[$cacheClass];
         }
-        /** @var $obj CacheHandler */
-        $obj = new $cacheClass;
-        if (!$obj instanceof CacheHandler) {
-            throw new Exception("{$cacheClass} must be of type " . SerializerInterface::class);
+        $cache = new $cacheClass;
+        if (!$cache instanceof AbstractMultiCache) {
+            throw new Exception("{$cacheClass} must be of type " . AbstractMultiCache::class);
         }
-        $obj->setLocker($this->locker);
-        $obj->setPrefix($this->getPrefix());
-        $obj->setContainer($this->container);
-        $this->cacheObjs[$cacheClass] = $obj;
-        return $obj;
+        $proxy = new CacheProxy($this->getEngine(), $cache);
+        $this->cacheObjs[$cacheClass] = $proxy;
+        return $proxy;
     }
 
 

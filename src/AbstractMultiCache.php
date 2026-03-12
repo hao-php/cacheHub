@@ -3,23 +3,13 @@ declare(strict_types=1);
 
 namespace Haoa\CacheHub;
 
-use Haoa\CacheHub\Driver\ApcuDriver;
-use Haoa\CacheHub\Driver\RedisDriver;
-use Haoa\CacheHub\Serializer\JsonSerializer;
-use Haoa\CacheHub\Serializer\OriginalSerializer;
-
-abstract class CacheHandler
+abstract class AbstractMultiCache
 {
-
-    use HandlerTrait;
-
-    /** 缓存前缀 */
-    public $prefix = '';
 
     /** 缓存key */
     public $key = '';
 
-    /** 当数据为空时存的值, _cachehub_null */
+    /** 当数据为空时存的值 */
     public $nullValue = '';
 
     /** 是否缓存空值 */
@@ -43,46 +33,24 @@ abstract class CacheHandler
     /** build数据时是否加锁 */
     public $buildLock = false;
 
-    /** @var array */
-    public $cacheListExample = [
-        [
-            'driver' => ApcuDriver::class,
-            'serializer' => OriginalSerializer::class, // default
-            'null_ttl' => 5,
-            'ttl' => 5,
-        ],
-        [
-            'driver' => RedisDriver::class,
-            'driver_handler' => null,
-            'serializer' => JsonSerializer::class,
-            'ttl' => 300,
-            'null_ttl' => 60,
-        ],
-    ];
 
-
-    abstract protected function getCacheList(): array;
+    abstract public function getCacheList(): array;
 
     /**
      * 构建数据
      * @param mixed $params
      * @return mixed
      */
-    abstract protected function build($params);
+    abstract public function build($params);
 
     /**
      * 拿到数据后, 包装数据再返回
-     * @param mixed $params
+     * @param mixed $data
      * @return mixed
      */
-    protected function wrapData($data)
+    public function wrapData($data)
     {
         return $data;
-    }
-
-    public function setPrefix($prefix)
-    {
-        $this->prefix = $prefix;
     }
 
     /**
@@ -90,7 +58,7 @@ abstract class CacheHandler
      * @param array $params
      * @return array 以key为下标的数组
      */
-    protected function multiBuild(array $params): array
+    public function multiBuild(array $params): array
     {
         throw new \Exception("multiBuild is not implemented");
     }

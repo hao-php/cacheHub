@@ -146,7 +146,6 @@ class CacheHubTest extends TestCase
         $redis->flushDB();
 
         $cacheHub = Common::getCacheHub();
-        /** @var TestCache2 $cache */
         $cache = $cacheHub->getCache(TestCache2::class);
         foreach ($cacheTmp as $field => $v) {
             $cache->$field = $v;
