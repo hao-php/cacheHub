@@ -12,9 +12,17 @@ class TestHelper
      */
     public static function getRedis()
     {
+        $configFile = __DIR__ . '/config.php';
+        if (!file_exists($configFile)) {
+            throw new RuntimeException('测试配置文件不存在，请先复制 config.example.php 为 config.php');
+        }
+
+        $config = require $configFile;
+        $redisConfig = $config['redis'];
+
         $redis = new Redis();
-        $redis->connect('redis');
-        $redis->select(3);
+        $redis->connect($redisConfig['host'], $redisConfig['port']);
+        $redis->select($redisConfig['db']);
         return $redis;
     }
 
