@@ -2,11 +2,11 @@
 
 use Haoa\CacheHub\AbstractMultiCache;
 use Haoa\CacheHub\CacheHub;
+use Haoa\CacheHub\CacheLevel;
 use Haoa\CacheHub\Driver\ApcuDriver;
 use Haoa\CacheHub\Driver\RedisDriver as RedisDriver;
 use Haoa\CacheHub\Locker\RedisLock;
 use Haoa\CacheHub\Serializer\JsonSerializer;
-use Haoa\CacheHub\Serializer\RawSerializer;
 
 require __DIR__ . '/autoload.php';
 
@@ -33,24 +33,23 @@ class ExTest extends AbstractMultiCache
 
     public $isCacheNull = true;
 
-    public function getCacheList(): array
+    public function getLevels(): array
     {
         $redis = new \Redis();
         $redis->connect('redis');
         $redis->select(3);
         return [
-            [
-                'driver' => ApcuDriver::class,
-                'serializer' => RawSerializer::class,
-                'ttl' => 5,
-            ],
-            [
-                'driver' => RedisDriver::class,
-                'driver_handler' => $redis,
-                'serializer' => JsonSerializer::class,
-                'ttl' => 300,
-                'null_ttl' => 60,
-            ],
+            new CacheLevel(
+                driver: ApcuDriver::class,
+                ttl: 5,
+            ),
+            new CacheLevel(
+                driver: RedisDriver::class,
+                serializer: JsonSerializer::class,
+                ttl: 300,
+                nullTtl: 60,
+                driverHandler: $redis,
+            ),
         ];
     }
 

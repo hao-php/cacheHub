@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 
 use Haoa\CacheHub\AbstractMultiCache;
+use Haoa\CacheHub\CacheLevel;
 use Haoa\CacheHub\Driver\ApcuDriver;
 use Haoa\CacheHub\Driver\RedisDriver;
 use Haoa\CacheHub\Serializer\JsonSerializer;
@@ -37,16 +38,16 @@ class TestCache extends AbstractMultiCache
         return call_user_func($this->wrapFunc, $data);
     }
 
-    public function getCacheList(): array
+    public function getLevels(): array
     {
         return [
-            [
-                'driver' => RedisDriver::class,
-                'driver_handler' => new RedisPool(),
-                'serializer' => JsonSerializer::class,
-                'ttl' => $this->ttl,
-                'null_ttl' => $this->nullTtl,
-            ],
+            new CacheLevel(
+                driver: RedisDriver::class,
+                serializer: JsonSerializer::class,
+                ttl: $this->ttl,
+                nullTtl: $this->nullTtl,
+                driverHandler: new RedisPool(),
+            ),
         ];
     }
 }
@@ -87,22 +88,21 @@ class TestCache2 extends AbstractMultiCache
         return call_user_func($this->multiBuildFunc, $params);
     }
 
-    public function getCacheList(): array
+    public function getLevels(): array
     {
         return [
-            [
-                'driver' => ApcuDriver::class,
-                'serializer' => RawSerializer::class, // default
-                'null_ttl' => 5,
-                'ttl' => 5,
-            ],
-            [
-                'driver' => RedisDriver::class,
-                'driver_handler' => new RedisPool(),
-                'serializer' => JsonSerializer::class,
-                'ttl' => $this->ttl,
-                'null_ttl' => $this->nullTtl,
-            ],
+            new CacheLevel(
+                driver: ApcuDriver::class,
+                ttl: 5,
+                nullTtl: 5,
+            ),
+            new CacheLevel(
+                driver: RedisDriver::class,
+                serializer: JsonSerializer::class,
+                ttl: $this->ttl,
+                nullTtl: $this->nullTtl,
+                driverHandler: new RedisPool(),
+            ),
         ];
     }
 }
@@ -115,22 +115,20 @@ class TestRepeatedCache extends AbstractMultiCache
     public $nullValue = '';
     public $valueFunc;
 
-    public function getCacheList(): array
+    public function getLevels(): array
     {
         return [
-            [
-                'driver' => ApcuDriver::class,
-                'serializer' => RawSerializer::class, // default
-                'null_ttl' => 5,
-                'ttl' => 5,
-            ],
-            [
-                'driver' => RedisDriver::class,
-                'driver_handler' => null,
-                'serializer' => JsonSerializer::class,
-                'ttl' => 300,
-                'null_ttl' => 60,
-            ],
+            new CacheLevel(
+                driver: ApcuDriver::class,
+                ttl: 5,
+                nullTtl: 5,
+            ),
+            new CacheLevel(
+                driver: RedisDriver::class,
+                serializer: JsonSerializer::class,
+                ttl: 300,
+                nullTtl: 60,
+            ),
         ];
     }
 

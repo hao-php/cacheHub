@@ -7,7 +7,6 @@ use Haoa\CacheHub\Common\Utils;
 use Haoa\CacheHub\Driver\AbstractDriver;
 use Haoa\CacheHub\Exception\CacheException;
 use Haoa\CacheHub\Locker\LockInterface;
-use Haoa\CacheHub\Serializer\RawSerializer;
 use Haoa\CacheHub\Serializer\SerializerInterface;
 
 class CacheEngine
@@ -31,15 +30,16 @@ class CacheEngine
         $this->logger = $logger;
     }
 
-    protected function getDriver($class, $serializerClass, $handler = null): AbstractDriver
+    protected function getDriver(CacheLevel $level): AbstractDriver
     {
+        $class = $level->driver;
         if (!isset($this->driverObjs[$class])) {
             $this->driverObjs[$class] = new $class;
             if (!$this->driverObjs[$class] instanceof AbstractDriver) {
                 throw new CacheException("driver[{$class}] must be of type " . AbstractDriver::class);
             }
-            $this->driverObjs[$class]->setHandler($handler);
-            $this->driverObjs[$class]->setSerializer($this->getSerializer($serializerClass));
+            $this->driverObjs[$class]->setHandler($level->driverHandler);
+            $this->driverObjs[$class]->setSerializer($this->getSerializer($level->serializer));
         }
         return $this->driverObjs[$class];
     }
@@ -53,6 +53,20 @@ class CacheEngine
             }
         }
         return $this->serializerObjs[$class];
+    }
+
+    /**
+     * @param CacheLevel[] $levels
+     */
+    protected function validateLevels(array $levels): void
+    {
+        if (empty($levels)) {
+            throw new CacheException('levels is empty');
+        }
+        $driverClasses = array_column($levels, 'driver');
+        if (count($driverClasses) !== count(array_unique($driverClasses))) {
+            throw new CacheException('levels 中不能配置相同的 driver');
+        }
     }
 
     protected function getKey(AbstractMultiCache $cache): string
@@ -193,31 +207,25 @@ class CacheEngine
      */
     public function get(AbstractMultiCache $cache, $keyParams = '', $refresh = false): array
     {
-        if (empty($cache->getCacheList())) {
-            throw new \Exception('cacheList is empty');
-        }
+        $levels = $cache->getLevels();
+        $this->validateLevels($levels);
         $setDrivers = [];
-        $len = count($cache->getCacheList());
+        $len = count($levels);
         $index = 0;
         $data = null;
         $get = false;
         $dataFrom = '';
 
         if (!$refresh) {
-            foreach ($cache->getCacheList() as $v) {
+            foreach ($levels as $level) {
                 $index++;
-                if (empty($v['driver'])) {
-                    throw new \Exception('driver is empty');
-                }
-                $serializerClass = $v['serializer'] ?: RawSerializer::class;
-                $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
-
+                $driver = $this->getDriver($level);
                 $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
 
                 $data = $driver->get($key);
                 list($get, $data) = $this->parseCacheData($cache, $data);
                 if ($get) {
-                    $dataFrom = $v['driver'];
+                    $dataFrom = $level->driver;
                     break;
                 }
 
@@ -226,34 +234,30 @@ class CacheEngine
                     $stack = new \SplStack();
                     list ($get, $data) = $this->lockGetData($cache, $driver, $key, $keyParams, $stack);
                     if ($get) {
-                        $dataFrom = $v['driver'];
+                        $dataFrom = $level->driver;
                         break;
                     }
                 }
 
                 $setDrivers[] = [
-                    'driver_class' => $v['driver'],
+                    'driver_class' => $level->driver,
                     'driver' => $driver,
                     'key' => $key,
-                    'ttl' => $v['ttl'] ?? 0,
-                    'null_ttl' => $v['null_ttl'] ?? 0,
+                    'ttl' => $level->ttl,
+                    'null_ttl' => $level->nullTtl,
                 ];
             }
         } else {
-            foreach ($cache->getCacheList() as $v) {
-                if (empty($v['driver'])) {
-                    throw new \Exception('driver is empty');
-                }
-                $serializerClass = $v['serializer'] ?: RawSerializer::class;
-                $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
+            foreach ($levels as $level) {
+                $driver = $this->getDriver($level);
                 $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
 
                 $setDrivers[] = [
-                    'driver_class' => $v['driver'],
+                    'driver_class' => $level->driver,
                     'driver' => $driver,
                     'key' => $key,
-                    'ttl' => $v['ttl'] ?? 0,
-                    'null_ttl' => $v['null_ttl'] ?? 0,
+                    'ttl' => $level->ttl,
+                    'null_ttl' => $level->nullTtl,
                 ];
             }
         }
@@ -286,20 +290,15 @@ class CacheEngine
      */
     public function multiGet(AbstractMultiCache $cache, array $keyParamsArr): array
     {
-        if (empty($cache->getCacheList())) {
-            throw new \Exception('cacheList is empty');
-        }
+        $levels = $cache->getLevels();
+        $this->validateLevels($levels);
 
         $keyParamsArrTmp = $keyParamsArr;
         $result = [];
         $setDrivers = [];
         $dataFrom = [];
-        foreach ($cache->getCacheList() as $v) {
-            if (empty($v['driver'])) {
-                throw new \Exception('driver is empty');
-            }
-            $serializerClass = $v['serializer'] ?: RawSerializer::class;
-            $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
+        foreach ($levels as $level) {
+            $driver = $this->getDriver($level);
 
             $keyArr = [];
             $keyMap = [];
@@ -319,17 +318,17 @@ class CacheEngine
                     $emptyKeyArr[$dKey] = $keyMap[$dKey];
                 } else {
                     $result[$keyMap[$dKey]] = $value;
-                    $dataFrom[$keyMap[$dKey]] = $v['driver'];
+                    $dataFrom[$keyMap[$dKey]] = $level->driver;
                 }
             }
 
             if (!empty($emptyKeyArr)) {
                 $setDrivers[] = [
-                    'driver_class' => $v['driver'],
+                    'driver_class' => $level->driver,
                     'driver' => $driver,
                     'key_arr' => $emptyKeyArr,
-                    'ttl' => $v['ttl'] ?? 0,
-                    'null_ttl' => $v['null_ttl'] ?? 0,
+                    'ttl' => $level->ttl,
+                    'null_ttl' => $level->nullTtl,
                 ];
             }
         }
@@ -380,24 +379,20 @@ class CacheEngine
 
     public function update(AbstractMultiCache $cache, $keyParams = ''): int
     {
+        $levels = $cache->getLevels();
+        $this->validateLevels($levels);
         $data = $cache->build($keyParams);
         $successNum = 0;
-        $cacheList = $cache->getCacheList();
-        $cacheList = array_reverse($cacheList);
-        foreach ($cacheList as $v) {
-            if (empty($v['driver'])) {
-                throw new \Exception('driver is empty');
-            }
-            $serializerClass = $v['serializer'] ?: RawSerializer::class;
-            $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
-
+        $levels = array_reverse($levels);
+        foreach ($levels as $level) {
+            $driver = $this->getDriver($level);
             $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
-            $ret = $this->setBuildData($cache, $driver, $key, $data, $v['ttl'] ?? 0, $v['null_ttl'] ?? 0);
+            $ret = $this->setBuildData($cache, $driver, $key, $data, $level->ttl, $level->nullTtl);
             if (!$ret) {
-                $this->logger and $this->logger->error("key:{$key}, " . $v['driver'] . " fail to set");
+                $this->logger and $this->logger->error("key:{$key}, " . $level->driver . " fail to set");
             } else {
                 $successNum++;
-                $this->logger and $this->logger->debug("key:{$key}, " . $v['driver'] . " set successfully");
+                $this->logger and $this->logger->debug("key:{$key}, " . $level->driver . " set successfully");
             }
         }
 
@@ -409,12 +404,9 @@ class CacheEngine
      */
     public function callDriverMethod(AbstractMultiCache $cache, string $name, array $arguments)
     {
-        if (count($cache->getCacheList()) == 1) {
-            $cacheList = $cache->getCacheList();
-            $v = reset($cacheList);
-            $serializerClass = $v['serializer'] ?? RawSerializer::class;
-            $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
-
+        $levels = $cache->getLevels();
+        if (count($levels) == 1) {
+            $driver = $this->getDriver($levels[0]);
             return call_user_func_array([$driver, $name], $arguments);
         }
         throw new \Exception("{$name} is unsupported");

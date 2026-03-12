@@ -34,7 +34,11 @@ abstract class AbstractMultiCache
     public $buildLock = false;
 
 
-    abstract public function getCacheList(): array;
+    /**
+     * 定义缓存层级
+     * @return CacheLevel[]
+     */
+    abstract public function getLevels(): array;
 
     /**
      * 构建数据
