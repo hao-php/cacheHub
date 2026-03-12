@@ -238,7 +238,7 @@ class CacheEngine
         $lockExpireTime = (int)round($cache->lockRetryCount * $cache->lockRetryInterval / 1000) + 10;
 
         if ($this->locker->tryLock($lockKey, 1, $lockExpireTime)) {
-            Utils::stackDefer($stack, function () use ($lockKey) {
+            Utils::scopeDefer($stack, function () use ($lockKey) {
                 $this->locker->unLock($lockKey);
             });
             return [false, null];

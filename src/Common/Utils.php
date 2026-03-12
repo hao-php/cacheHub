@@ -21,7 +21,7 @@ class Utils
      * @param callable $callback
      * @return void
      */
-    public static function stackDefer(?\SplStack &$stack, callable $callback)
+    public static function scopeDefer(?\SplStack &$stack, callable $callback)
     {
         $stack = $stack ?? new \SplStack();
         $stack->push(new class($callback) {
