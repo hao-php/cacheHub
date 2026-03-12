@@ -23,14 +23,14 @@ abstract class AbstractDriver
 
     abstract public function delete(string $key): bool;
 
-    abstract public function multiGet(array $keyArr): array;
+    abstract public function multiGet(array $keys): array;
 
-    abstract public function multiSet(array $params, int $ttl): bool;
+    abstract public function multiSet(array $items, int $ttl): bool;
 
-    abstract public function multiDelete(array $key);
+    abstract public function multiDelete(array $keys);
 
-    /** 构建最终的缓存key */
-    public function buildKey(string $prefix, string $key, $keyParams = ''): string
+    /** 构建最终的缓存 key */
+    public function makeKey(string $prefix, string $key, $keyParams = ''): string
     {
         $str = '';
         if (!empty($keyParams)) {
@@ -64,7 +64,7 @@ abstract class AbstractDriver
         $this->serializer = $serializer;
     }
 
-    public function getCanLock(): bool
+    public function canLock(): bool
     {
         return $this->canLock;
     }
@@ -73,6 +73,5 @@ abstract class AbstractDriver
     {
         return call_user_func_array([$this->handler, $name], $arguments);
     }
-
 
 }

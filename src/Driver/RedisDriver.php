@@ -22,13 +22,13 @@ class RedisDriver extends AbstractDriver
         return $this->serializer->decode($value);
     }
 
-    public function multiGet(array $keyArr): array
+    public function multiGet(array $keys): array
     {
-        $ret = $this->handler->mGet($keyArr);
-        $len = count($keyArr);
+        $ret = $this->handler->mGet($keys);
+        $len = count($keys);
         $data = [];
         for ($i = 0; $i < $len; $i++) {
-            $data[$keyArr[$i]] = $this->serializer->decode($ret[$i] ?? null);
+            $data[$keys[$i]] = $this->serializer->decode($ret[$i] ?? null);
         }
         return $data;
     }
@@ -42,10 +42,10 @@ class RedisDriver extends AbstractDriver
         return (bool)$this->handler->setex($key, $ttl, $value);
     }
 
-    public function multiSet(array $params, int $ttl = 0): bool
+    public function multiSet(array $items, int $ttl = 0): bool
     {
         $redis = $this->handler->multi(\Redis::PIPELINE);
-        foreach ($params as $key => &$v) {
+        foreach ($items as $key => &$v) {
             $v = $this->serializer->encode($v);
             $redis->setex($key, $ttl, $v);
         }
@@ -58,9 +58,9 @@ class RedisDriver extends AbstractDriver
         return (bool)$this->handler->del($key);
     }
 
-    public function multiDelete(array $key)
+    public function multiDelete(array $keys)
     {
-        return $this->handler->del(...$key);
+        return $this->handler->del(...$keys);
     }
 
 }

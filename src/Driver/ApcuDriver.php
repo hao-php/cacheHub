@@ -26,10 +26,10 @@ class ApcuDriver extends AbstractDriver
         return $this->serializer->decode($value);
     }
 
-    public function multiGet(array $keyArr): array
+    public function multiGet(array $keys): array
     {
         $data = [];
-        foreach ($keyArr as $key) {
+        foreach ($keys as $key) {
             $value = apcu_fetch($key);
             if (Utils::isMiss($value)) {
                 $data[$key] = null;
@@ -49,9 +49,9 @@ class ApcuDriver extends AbstractDriver
         return (bool)apcu_store($key, $value, (int)$ttl);
     }
 
-    public function multiSet(array $params, int $ttl): bool
+    public function multiSet(array $items, int $ttl): bool
     {
-        foreach ($params as $key => $value) {
+        foreach ($items as $key => $value) {
             $value = $this->serializer->encode($value);
             if (!Utils::isMiss($value)) {
                 apcu_store($key, $value, $ttl);
@@ -65,8 +65,8 @@ class ApcuDriver extends AbstractDriver
         return (bool)apcu_delete($key);
     }
 
-    public function multiDelete(array $key)
+    public function multiDelete(array $keys)
     {
-        return apcu_delete($key);
+        return apcu_delete($keys);
     }
 }

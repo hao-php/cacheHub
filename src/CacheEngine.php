@@ -284,7 +284,7 @@ class CacheEngine
         foreach ($levels as $level) {
             $index++;
             $driver = $this->getDriver($level);
-            $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
+            $key = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
 
             if (!$refresh) {
                 $data = $driver->get($key);
@@ -295,7 +295,7 @@ class CacheEngine
                 }
 
                 // 最后一级缓存，尝试加锁
-                if ($index == $len && $driver->getCanLock()) {
+                if ($index == $len && $driver->canLock()) {
                     $stack = new \SplStack();
                     list($hit, $data) = $this->tryLockAndWait($cache, $driver, $key, $keyParams, $stack);
                     if ($hit) {
@@ -348,33 +348,33 @@ class CacheEngine
         foreach ($levels as $level) {
             $driver = $this->getDriver($level);
 
-            $keyArr = [];
+            $keys = [];
             $keyMap = [];
             foreach ($keyParamsArrTmp as $keyParams) {
-                $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
-                $keyArr[] = $key;
+                $key = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
+                $keys[] = $key;
                 $keyMap[$key] = $keyParams;
             }
 
             $keyParamsArrTmp = [];
-            $dataArr = $driver->multiGet($keyArr);
-            $emptyKeyArr = [];
+            $dataArr = $driver->multiGet($keys);
+            $missedKeys = [];
             foreach ($dataArr as $dKey => $value) {
                 list($hit, $value) = $this->resolveCacheData($cache, $value);
                 if (!$hit) {
                     $keyParamsArrTmp[] = $keyMap[$dKey];
-                    $emptyKeyArr[$dKey] = $keyMap[$dKey];
+                    $missedKeys[$dKey] = $keyMap[$dKey];
                 } else {
                     $result[$keyMap[$dKey]] = $value;
                     $source[$keyMap[$dKey]] = $level->driver;
                 }
             }
 
-            if (!empty($emptyKeyArr)) {
+            if (!empty($missedKeys)) {
                 $pendingWrites[] = [
                     'driver_class' => $level->driver,
                     'driver' => $driver,
-                    'key_arr' => $emptyKeyArr,
+                    'missed_keys' => $missedKeys,
                     'ttl' => $level->ttl,
                     'nullTtl' => $level->nullTtl,
                 ];
@@ -393,10 +393,10 @@ class CacheEngine
             $pw = $pendingWrites[$i];
             /** @var AbstractDriver $driver */
             $driver = $pw['driver'];
-            $keyArr = $pw['key_arr'];
+            $missedKeys = $pw['missed_keys'];
 
             $saveData = [];
-            foreach ($keyArr as $key => $keyParams) {
+            foreach ($missedKeys as $key => $keyParams) {
                 $data = $result[$keyParams] ?? null;
                 if (!$this->isEmptyData($data)) {
                     $saveData[$key] = $this->wrapDataVersion($cache, $data);
@@ -436,7 +436,7 @@ class CacheEngine
         $levels = array_reverse($levels);
         foreach ($levels as $level) {
             $driver = $this->getDriver($level);
-            $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
+            $key = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
             $ret = $this->saveBuildResult($cache, $driver, $key, $data, $level->ttl, $level->nullTtl);
             if (!$ret) {
                 $this->logger and $this->logger->error("key:{$key}, " . $level->driver . " fail to set");
