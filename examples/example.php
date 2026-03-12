@@ -45,8 +45,8 @@ class ExTest extends AbstractMultiCache
             ),
             new CacheLevel(
                 driver: RedisDriver::class,
-                serializer: JsonSerializer::class,
                 ttl: 300,
+                serializer: JsonSerializer::class,
                 nullTtl: 60,
                 driverHandler: $redis,
             ),
@@ -115,27 +115,27 @@ class AppCacheHub
 
         // 批量获取数据
         $data = $cache->multiGet(['test_1', 'test_2']);
-        $from = $cache->getSource();
-        var_dump($data, $from);
+        $source = $cache->getSource();
+        var_dump($data, $source);
 
         apcu_delete('ex:ex_test:test_1');
 
         $data = $cache->multiGet(['test_1', 'test_2']);
-        $from = $cache->getSource();
-        var_dump($data, $from);
+        $source = $cache->getSource();
+        var_dump($data, $source);
         //
         // $data = $cache->multiGet(['test_1', 'test_2']);
-        // $from = $cache->getSource();
-        // var_dump($data, $from);
+        // $source = $cache->getSource();
+        // var_dump($data, $source);
 
         // 获取数据
         // $data = $cache->get();
-        // $from = $cache->getSource();
-        // var_dump($data, $from);
+        // $source = $cache->getSource();
+        // var_dump($data, $source);
         //
         // $data = $cache->get();
-        // $from = $cache->getSource();
-        // var_dump($data, $from);
+        // $source = $cache->getSource();
+        // var_dump($data, $source);
 
         // 强制刷新, 获取数据
         // $data = $cache->get('', true);
