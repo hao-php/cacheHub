@@ -78,4 +78,33 @@ class ValidationTest extends TestCase
         $this->assertNotSame($cache1, $cache3);
     }
 
+    /** levels 为空时应抛出异常 */
+    public function testEmptyLevelsThrows()
+    {
+        $emptyLevelsCache = new class extends AbstractMultiCache {
+            public $key = 'test_empty_levels';
+
+            public function getLevels(): array
+            {
+                return [];
+            }
+
+            public function build($params)
+            {
+                return 'data';
+            }
+        };
+
+        $cacheHub = TestHelper::getCacheHub();
+
+        $this->expectException(CacheException::class);
+        $this->expectExceptionMessage('levels is empty');
+
+        $ref = new ReflectionClass($cacheHub);
+        $method = $ref->getMethod('getEngine');
+        $method->setAccessible(true);
+        $engine = $method->invoke($cacheHub);
+        $engine->get($emptyLevelsCache);
+    }
+
 }

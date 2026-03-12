@@ -133,4 +133,46 @@ class GetTest extends TestCase
         $this->assertEquals(RedisDriver::class, $cache->getSource());
     }
 
+    /** 单级缓存应支持 delete 方法透传 */
+    public function testDelete()
+    {
+        $cacheHub = TestHelper::getCacheHub();
+        $cache = $cacheHub->getCache(SingleLevelCache::class);
+        $cache->key = 'test_delete';
+        $cache->valueFunc = function ($params) {
+            return 'to_be_deleted';
+        };
+
+        $cache->get();
+        $key = 'unit_test:test_delete';
+        $this->assertTrue((bool)$this->redis->exists($key));
+
+        $cache->delete($key);
+        $this->assertFalse((bool)$this->redis->exists($key));
+    }
+
+    /** 单级缓存应支持 multiDelete 方法透传 */
+    public function testMultiDelete()
+    {
+        $cacheHub = TestHelper::getCacheHub();
+        $cache = $cacheHub->getCache(SingleLevelCache::class);
+        $cache->key = 'test_multi_delete';
+        $cache->valueFunc = function ($params) {
+            return 'data';
+        };
+
+        // 写入两个 key
+        $cache->get('a');
+        $cache->get('b');
+        $key1 = 'unit_test:test_multi_delete:a';
+        $key2 = 'unit_test:test_multi_delete:b';
+        $this->assertTrue((bool)$this->redis->exists($key1));
+        $this->assertTrue((bool)$this->redis->exists($key2));
+
+        // 批量删除
+        $cache->multiDelete([$key1, $key2]);
+        $this->assertFalse((bool)$this->redis->exists($key1));
+        $this->assertFalse((bool)$this->redis->exists($key2));
+    }
+
 }
