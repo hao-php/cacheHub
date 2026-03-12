@@ -19,9 +19,9 @@ class CacheEngine
 
     protected ?LoggerInterface $logger;
 
-    protected array $driverObjs = [];
+    protected array $drivers = [];
 
-    protected array $serializerObjs = [];
+    protected array $serializers = [];
 
     public function __construct($locker, string $prefix, ?LoggerInterface $logger = null)
     {
@@ -38,15 +38,15 @@ class CacheEngine
     protected function getDriver(CacheLevel $level): AbstractDriver
     {
         $class = $level->driver;
-        if (!isset($this->driverObjs[$class])) {
-            $this->driverObjs[$class] = new $class;
-            if (!$this->driverObjs[$class] instanceof AbstractDriver) {
+        if (!isset($this->drivers[$class])) {
+            $this->drivers[$class] = new $class;
+            if (!$this->drivers[$class] instanceof AbstractDriver) {
                 throw new CacheException("driver[{$class}] must be of type " . AbstractDriver::class);
             }
-            $this->driverObjs[$class]->setHandler($level->driverHandler);
-            $this->driverObjs[$class]->setSerializer($this->getSerializer($level->serializer));
+            $this->drivers[$class]->setHandler($level->driverHandler);
+            $this->drivers[$class]->setSerializer($this->getSerializer($level->serializer));
         }
-        return $this->driverObjs[$class];
+        return $this->drivers[$class];
     }
 
     /**
@@ -56,13 +56,13 @@ class CacheEngine
      */
     protected function getSerializer($class): SerializerInterface
     {
-        if (!isset($this->serializerObjs[$class])) {
-            $this->serializerObjs[$class] = new $class;
-            if (!$this->serializerObjs[$class] instanceof SerializerInterface) {
+        if (!isset($this->serializers[$class])) {
+            $this->serializers[$class] = new $class;
+            if (!$this->serializers[$class] instanceof SerializerInterface) {
                 throw new CacheException("serializer[{$class}] must be of type " . SerializerInterface::class);
             }
         }
-        return $this->serializerObjs[$class];
+        return $this->serializers[$class];
     }
 
     /**
@@ -93,13 +93,23 @@ class CacheEngine
     }
 
     /**
+     * 判断数据是否为空（null、false、空字符串）
+     * @param mixed $data
+     * @return bool
+     */
+    protected function isEmptyData($data): bool
+    {
+        return $data === '' || $data === null || $data === false;
+    }
+
+    /**
      * 构建分布式锁的 key
      * @param string $prefix key 前缀
      * @param string $key 缓存 key
      * @param mixed $keyParams key 参数
      * @return string
      */
-    protected function buildLockKey($prefix, $key, $keyParams): string
+    protected function makeLockKey($prefix, $key, $keyParams): string
     {
         $str = '';
         if (!empty($keyParams)) {
@@ -116,12 +126,12 @@ class CacheEngine
     }
 
     /**
-     * 校验缓存数据的版本号，版本不匹配则视为未命中
+     * 校验并剥离版本号包装，版本不匹配则视为未命中
      * @param AbstractMultiCache $cache
      * @param mixed &$data 校验通过后会剥离版本包装，只保留原始数据
      * @return bool
      */
-    protected function checkDataVersion(AbstractMultiCache $cache, &$data)
+    protected function stripDataVersion(AbstractMultiCache $cache, &$data)
     {
         if (!$cache->addVersion) {
             return true;
@@ -139,7 +149,7 @@ class CacheEngine
      * @param mixed $data 原始数据
      * @return mixed 包装后的数据，或未开启版本时返回原数据
      */
-    protected function addDataVersion(AbstractMultiCache $cache, $data)
+    protected function wrapDataVersion(AbstractMultiCache $cache, $data)
     {
         if (!$cache->addVersion) {
             return $data;
@@ -154,13 +164,12 @@ class CacheEngine
      * 将空值标记（nullValue）写入缓存，防止缓存穿透
      * @return bool
      */
-    protected function cacheNullValue(AbstractMultiCache $cache, AbstractDriver $driver, $key, $nullTtl)
+    protected function cacheNullValue(AbstractMultiCache $cache, AbstractDriver $driver, $key, int $nullTtl)
     {
         if (!$cache->isCacheNull) {
             return true;
         }
-        $nullTtl = intval($nullTtl);
-        if (empty($nullTtl) || $nullTtl <= 0) {
+        if ($nullTtl <= 0) {
             $nullTtl = CacheHub::DEFAULT_NULL_TTL;
         }
         return (bool)$driver->set($key, $cache->nullValue, $nullTtl);
@@ -185,7 +194,7 @@ class CacheEngine
      */
     protected function resolveCacheData(AbstractMultiCache $cache, $data)
     {
-        if (!Utils::checkEmpty($data) && $data !== '' && $this->checkDataVersion($cache, $data)) {
+        if (!$this->isEmptyData($data) && $this->stripDataVersion($cache, $data)) {
             return [true, $data];
         }
 
@@ -200,18 +209,16 @@ class CacheEngine
      * 将 build 结果写入缓存，空数据则写入空值标记
      * @return bool
      */
-    protected function setBuildData(AbstractMultiCache $cache, AbstractDriver $driver, $key, $data, $ttl, $nullTtl)
+    protected function saveBuildResult(AbstractMultiCache $cache, AbstractDriver $driver, $key, $data, int $ttl, int $nullTtl)
     {
-        if ($data === '' || Utils::checkEmpty($data)) {
-            $data = null;
+        if ($this->isEmptyData($data)) {
             return $this->cacheNullValue($cache, $driver, $key, $nullTtl);
         }
 
-        $ttl = intval($ttl);
-        if ($ttl == 0 || $ttl < 0) {
+        if ($ttl <= 0) {
             $ttl = CacheHub::DEFAULT_TTL;
         }
-        $data = $this->addDataVersion($cache, $data);
+        $data = $this->wrapDataVersion($cache, $data);
         return (bool)$driver->set($key, $data, $ttl);
     }
 
@@ -219,7 +226,7 @@ class CacheEngine
      * 加锁场景下尝试获取缓存数据：获取锁则放行 build，未获取锁则等待其他进程写入
      * @return array{0: bool, 1: mixed} [是否命中, 数据]
      */
-    protected function lockGetData(AbstractMultiCache $cache, AbstractDriver $driver, $key, $keyParams, &$stack): array
+    protected function tryLockAndWait(AbstractMultiCache $cache, AbstractDriver $driver, $key, $keyParams, &$stack): array
     {
         if (!$cache->buildLock || empty($cache->buildWaitCount) || $cache->buildWaitCount <= 0) {
             return [false, null];
@@ -227,7 +234,7 @@ class CacheEngine
         if (empty($this->locker)) {
             throw new CacheException('locker is empty');
         }
-        $lockKey = $this->buildLockKey($this->prefix, $this->getKey($cache), $keyParams);
+        $lockKey = $this->makeLockKey($this->prefix, $this->getKey($cache), $keyParams);
         $lockExpireTime = (int)round($cache->buildWaitCount * $cache->buildWaitTime / 1000) + 10;
 
         if ($this->locker->tryLock($lockKey, 1, $lockExpireTime)) {
@@ -258,82 +265,65 @@ class CacheEngine
     }
 
     /**
+     * 获取缓存数据，未命中时自动 build 并回写
      * @return array{data: mixed, dataFrom: string}
      */
     public function get(AbstractMultiCache $cache, $keyParams = '', $refresh = false): array
     {
         $levels = $cache->getLevels();
         $this->validateLevels($levels);
-        $setDrivers = [];
+        $pendingWrites = [];
         $len = count($levels);
         $index = 0;
         $data = null;
-        $get = false;
+        $hit = false;
         $dataFrom = '';
 
-        if (!$refresh) {
-            foreach ($levels as $level) {
-                $index++;
-                $driver = $this->getDriver($level);
-                $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
+        foreach ($levels as $level) {
+            $index++;
+            $driver = $this->getDriver($level);
+            $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
 
+            if (!$refresh) {
                 $data = $driver->get($key);
-                list($get, $data) = $this->resolveCacheData($cache, $data);
-                if ($get) {
+                list($hit, $data) = $this->resolveCacheData($cache, $data);
+                if ($hit) {
                     $dataFrom = $level->driver;
                     break;
                 }
 
-                // 最后一级缓存
+                // 最后一级缓存，尝试加锁
                 if ($index == $len && $driver->getCanLock()) {
                     $stack = new \SplStack();
-                    list ($get, $data) = $this->lockGetData($cache, $driver, $key, $keyParams, $stack);
-                    if ($get) {
+                    list($hit, $data) = $this->tryLockAndWait($cache, $driver, $key, $keyParams, $stack);
+                    if ($hit) {
                         $dataFrom = $level->driver;
                         break;
                     }
                 }
-
-                $setDrivers[] = [
-                    'driver_class' => $level->driver,
-                    'driver' => $driver,
-                    'key' => $key,
-                    'ttl' => $level->ttl,
-                    'null_ttl' => $level->nullTtl,
-                ];
             }
-        } else {
-            foreach ($levels as $level) {
-                $driver = $this->getDriver($level);
-                $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
 
-                $setDrivers[] = [
-                    'driver_class' => $level->driver,
-                    'driver' => $driver,
-                    'key' => $key,
-                    'ttl' => $level->ttl,
-                    'null_ttl' => $level->nullTtl,
-                ];
-            }
+            $pendingWrites[] = [
+                'driver_class' => $level->driver,
+                'driver' => $driver,
+                'key' => $key,
+                'ttl' => $level->ttl,
+                'nullTtl' => $level->nullTtl,
+            ];
         }
 
-        if (!$get) {
+        if (!$hit) {
             $data = $cache->build($keyParams);
             $dataFrom = 'build';
         }
-        $setLen = count($setDrivers);
-        if ($setLen > 0) {
-            for ($i = $setLen - 1; $i >= 0; $i--) {
-                /** @var AbstractDriver $driver */
-                $driver = $setDrivers[$i]['driver'];
-                $key = $setDrivers[$i]['key'];
-                $driverClass = $setDrivers[$i]['driver_class'];
-                $ret = $this->setBuildData($cache, $driver, $key, $data, $setDrivers[$i]['ttl'], $setDrivers[$i]['null_ttl']);
-                if (!$ret) {
-                    $this->logger and $this->logger->error("key:{$key}, {$driverClass} fail to set");
-                } else {
-                    $this->logger and $this->logger->debug("key:{$key}, {$driverClass} set successfully");
-                }
+
+        for ($i = count($pendingWrites) - 1; $i >= 0; $i--) {
+            $pw = $pendingWrites[$i];
+            $ret = $this->saveBuildResult($cache, $pw['driver'], $pw['key'], $data, $pw['ttl'], $pw['nullTtl']);
+            if (!$ret) {
+                $this->logger and $this->logger->error("key:{$pw['key']}, {$pw['driver_class']} fail to set");
+            } else {
+                $this->logger and $this->logger->debug("key:{$pw['key']}, {$pw['driver_class']} set successfully");
             }
         }
 
@@ -341,6 +331,7 @@ class CacheEngine
     }
 
     /**
+     * 批量获取缓存数据，未命中的自动 multiBuild 并回写
      * @return array{data: array, dataFrom: array}
      */
     public function multiGet(AbstractMultiCache $cache, array $keyParamsArr): array
@@ -350,7 +341,7 @@ class CacheEngine
 
         $keyParamsArrTmp = $keyParamsArr;
         $result = [];
-        $setDrivers = [];
+        $pendingWrites = [];
         $dataFrom = [];
         foreach ($levels as $level) {
             $driver = $this->getDriver($level);
@@ -367,8 +358,8 @@ class CacheEngine
             $dataArr = $driver->multiGet($keyArr);
             $emptyKeyArr = [];
             foreach ($dataArr as $dKey => $value) {
-                list($get, $value) = $this->resolveCacheData($cache, $value);
-                if (!$get) {
+                list($hit, $value) = $this->resolveCacheData($cache, $value);
+                if (!$hit) {
                     $keyParamsArrTmp[] = $keyMap[$dKey];
                     $emptyKeyArr[$dKey] = $keyMap[$dKey];
                 } else {
@@ -378,12 +369,12 @@ class CacheEngine
             }
 
             if (!empty($emptyKeyArr)) {
-                $setDrivers[] = [
+                $pendingWrites[] = [
                     'driver_class' => $level->driver,
                     'driver' => $driver,
                     'key_arr' => $emptyKeyArr,
                     'ttl' => $level->ttl,
-                    'null_ttl' => $level->nullTtl,
+                    'nullTtl' => $level->nullTtl,
                 ];
             }
         }
@@ -396,28 +387,26 @@ class CacheEngine
             }
         }
 
-        $len = count($setDrivers);
-        if ($len > 0) {
-            for ($i = $len - 1; $i >= 0; $i--) {
-                /** @var AbstractDriver $driver */
-                $driver = $setDrivers[$i]['driver'];
-                $keyArr = $setDrivers[$i]['key_arr'];
+        for ($i = count($pendingWrites) - 1; $i >= 0; $i--) {
+            $pw = $pendingWrites[$i];
+            /** @var AbstractDriver $driver */
+            $driver = $pw['driver'];
+            $keyArr = $pw['key_arr'];
 
-                $saveData = [];
-                foreach ($keyArr as $key => $keyParams) {
-                    $data = $result[$keyParams] ?? null;
-                    if (!Utils::checkEmpty($data)) {
-                        $saveData[$key] = $this->addDataVersion($cache, $data);
-                    }
+            $saveData = [];
+            foreach ($keyArr as $key => $keyParams) {
+                $data = $result[$keyParams] ?? null;
+                if (!$this->isEmptyData($data)) {
+                    $saveData[$key] = $this->wrapDataVersion($cache, $data);
                 }
+            }
 
-                if (!empty($saveData)) {
-                    $ttl = intval($setDrivers[$i]['ttl'] ?? 0);
-                    if ($ttl == 0 || $ttl < 0) {
-                        $ttl = CacheHub::DEFAULT_TTL;
-                    }
-                    $driver->multiSet($saveData, $ttl);
+            if (!empty($saveData)) {
+                $ttl = $pw['ttl'];
+                if ($ttl <= 0) {
+                    $ttl = CacheHub::DEFAULT_TTL;
                 }
+                $driver->multiSet($saveData, $ttl);
             }
         }
 
@@ -432,6 +421,10 @@ class CacheEngine
         return ['data' => $arr, 'dataFrom' => $dataFrom];
     }
 
+    /**
+     * 主动更新缓存：重新 build 并写入所有层级
+     * @return int 成功写入的层级数
+     */
     public function update(AbstractMultiCache $cache, $keyParams = ''): int
     {
         $levels = $cache->getLevels();
@@ -442,7 +435,7 @@ class CacheEngine
         foreach ($levels as $level) {
             $driver = $this->getDriver($level);
             $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
-            $ret = $this->setBuildData($cache, $driver, $key, $data, $level->ttl, $level->nullTtl);
+            $ret = $this->saveBuildResult($cache, $driver, $key, $data, $level->ttl, $level->nullTtl);
             if (!$ret) {
                 $this->logger and $this->logger->error("key:{$key}, " . $level->driver . " fail to set");
             } else {
@@ -464,7 +457,7 @@ class CacheEngine
             $driver = $this->getDriver($levels[0]);
             return call_user_func_array([$driver, $name], $arguments);
         }
-        throw new \Exception("{$name} is unsupported");
+        throw new CacheException("{$name} is unsupported");
     }
 
 }
