@@ -54,8 +54,8 @@ class MultiLevelCache extends AbstractMultiCache
             ),
             new CacheLevel(
                 driver: RedisDriver::class,
-                serializer: JsonSerializer::class,
                 ttl: $this->ttl,
+                serializer: JsonSerializer::class,
                 nullTtl: $this->nullTtl,
                 driverHandler: new RedisPool(),
             ),
