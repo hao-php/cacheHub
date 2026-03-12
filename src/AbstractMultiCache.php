@@ -13,25 +13,25 @@ abstract class AbstractMultiCache
     public $nullValue = '';
 
     /** 是否缓存空值 */
-    public $isCacheNull = true;
+    public $cacheNull = true;
 
     /** 是否给数据添加版本号 */
-    public $addVersion = false;
+    public $versioned = false;
 
-    /**  数据版本号, 当addVersion=true时生效 */
+    /** 数据版本号，当 versioned=true 时生效 */
     public $version = 1;
 
-    /** 加锁等待重试次数，需要 buildLock=true */
-    public $buildWaitCount = 3;
+    /** 是否在 build 时加锁，防止并发重复构建 */
+    public $lockEnabled = false;
+
+    /** 加锁等待重试次数 */
+    public $lockRetryCount = 3;
 
     /** 加锁等待重试间隔，毫秒 */
-    public $buildWaitTime = 100;
+    public $lockRetryInterval = 100;
 
-    /** 等待超时处理模式：1=放行到 build，2=抛出异常 */
-    public $buildWaitMode = 1;
-
-    /** build数据时是否加锁 */
-    public $buildLock = false;
+    /** 锁等待超时处理模式：1=放行到 build，2=抛出异常 */
+    public $lockTimeoutMode = 1;
 
 
     /**

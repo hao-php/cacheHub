@@ -133,7 +133,7 @@ class CacheEngine
      */
     protected function stripDataVersion(AbstractMultiCache $cache, &$data)
     {
-        if (!$cache->addVersion) {
+        if (!$cache->versioned) {
             return true;
         }
         if (isset($data['cachehub_version']) && $data['cachehub_version'] == $cache->version) {
@@ -151,7 +151,7 @@ class CacheEngine
      */
     protected function wrapDataVersion(AbstractMultiCache $cache, $data)
     {
-        if (!$cache->addVersion) {
+        if (!$cache->versioned) {
             return $data;
         }
         return [
@@ -166,7 +166,7 @@ class CacheEngine
      */
     protected function cacheNullValue(AbstractMultiCache $cache, AbstractDriver $driver, $key, int $nullTtl)
     {
-        if (!$cache->isCacheNull) {
+        if (!$cache->cacheNull) {
             return true;
         }
         if ($nullTtl <= 0) {
@@ -228,14 +228,14 @@ class CacheEngine
      */
     protected function tryLockAndWait(AbstractMultiCache $cache, AbstractDriver $driver, $key, $keyParams, &$stack): array
     {
-        if (!$cache->buildLock || $cache->buildWaitCount <= 0) {
+        if (!$cache->lockEnabled || $cache->lockRetryCount <= 0) {
             return [false, null];
         }
         if (empty($this->locker)) {
             throw new CacheException('locker is empty');
         }
         $lockKey = $this->makeLockKey($this->prefix, $this->getKey($cache), $keyParams);
-        $lockExpireTime = (int)round($cache->buildWaitCount * $cache->buildWaitTime / 1000) + 10;
+        $lockExpireTime = (int)round($cache->lockRetryCount * $cache->lockRetryInterval / 1000) + 10;
 
         if ($this->locker->tryLock($lockKey, 1, $lockExpireTime)) {
             Utils::stackDefer($stack, function () use ($lockKey) {
@@ -244,8 +244,8 @@ class CacheEngine
             return [false, null];
         }
 
-        $sleepUs = $cache->buildWaitTime * 1000;
-        for ($i = 0; $i < $cache->buildWaitCount; $i++) {
+        $sleepUs = $cache->lockRetryInterval * 1000;
+        for ($i = 0; $i < $cache->lockRetryCount; $i++) {
             usleep($sleepUs);
 
             $data = $driver->get($key);
@@ -259,7 +259,7 @@ class CacheEngine
             }
         }
 
-        if ($cache->buildWaitMode == 2) {
+        if ($cache->lockTimeoutMode == 2) {
             throw new CacheException("build data timeout");
         }
 

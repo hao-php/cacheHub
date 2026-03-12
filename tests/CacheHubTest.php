@@ -45,13 +45,13 @@ class CacheHubTest extends TestCase
     {
 
         $cache = [
-            'buildLock' => false,
+            'lockEnabled' => false,
         ];
         $this->_testGet($cache);
 
 
         $cache = [
-            'buildLock' => true,
+            'lockEnabled' => true,
         ];
         $this->_testGet($cache);
 
@@ -128,13 +128,13 @@ class CacheHubTest extends TestCase
     public function testMultiGet()
     {
         $cache = [
-            'buildLock' => false,
+            'lockEnabled' => false,
         ];
         $this->_testGetArray($cache);
 
 
         $cache = [
-            'buildLock' => true,
+            'lockEnabled' => true,
         ];
         $this->_testMultiGet($cache);
 
@@ -220,13 +220,13 @@ class CacheHubTest extends TestCase
     public function testGetArray()
     {
         $cache = [
-            'buildLock' => false,
+            'lockEnabled' => false,
         ];
         $this->_testGetArray($cache);
 
 
         $cache = [
-            'buildLock' => true,
+            'lockEnabled' => true,
         ];
         $this->_testGetArray($cache);
 
@@ -284,13 +284,13 @@ class CacheHubTest extends TestCase
     public function testGetNull()
     {
         $cache = [
-            'buildLock' => false,
+            'lockEnabled' => false,
         ];
         $this->_testGetNull($cache);
 
 
         $cache = [
-            'buildLock' => true,
+            'lockEnabled' => true,
         ];
         $this->_testGetNull($cache);
     }
@@ -305,7 +305,7 @@ class CacheHubTest extends TestCase
             $cache->$field = $v;
         }
         $cache->key = 'test_null';
-        $cache->isCacheNull = true;
+        $cache->cacheNull = true;
         $cache->nullValue = '';
         $cache->nullTtl = 60;
         $cache->valueFunc = function ($params) {
@@ -338,7 +338,7 @@ class CacheHubTest extends TestCase
         $this->assertEquals('build', $from);
 
         $redis->flushDB();
-        $cache->isCacheNull = false;
+        $cache->cacheNull = false;
         $cache->valueFunc = function ($params) {
             return null;
         };
@@ -361,13 +361,13 @@ class CacheHubTest extends TestCase
     public function testVersion()
     {
         $cache = [
-            'buildLock' => false,
+            'lockEnabled' => false,
         ];
         $this->_testVersion($cache);
 
 
         $cache = [
-            'buildLock' => true,
+            'lockEnabled' => true,
         ];
         $this->_testVersion($cache);
     }
@@ -381,7 +381,7 @@ class CacheHubTest extends TestCase
         foreach ($cacheTmp as $field => $v) {
             $cache->$field = $v;
         }
-        $cache->addVersion = true;
+        $cache->versioned = true;
         $cache->version = 1;
         $cache->valueFunc = function ($params) {
             return 'test_1';
@@ -433,10 +433,10 @@ class CacheHubTest extends TestCase
 
         $cacheHub = Common::getCacheHub($redis);
         $cache = $cacheHub->getCache(TestCache2::class);
-        $cache->buildLock = true;
-        $cache->buildWaitMode = 1;
-        $cache->buildWaitTime = 10;
-        $cache->buildWaitCount = 5;
+        $cache->lockEnabled = true;
+        $cache->lockTimeoutMode = 1;
+        $cache->lockRetryInterval = 10;
+        $cache->lockRetryCount = 5;
         $cache->valueFunc = function ($params) {
             return 'test_lock';
         };
@@ -455,10 +455,10 @@ class CacheHubTest extends TestCase
             for ($i = 0; $i < 5; $i++) {
                 \Swoole\Coroutine::create(function () use ($wg, $i, &$fromArr, $cacheHub) {
                     $cache = $cacheHub->getCache(TestCache2::class, true);
-                    $cache->buildLock = true;
-                    $cache->buildWaitMode = 1;
-                    $cache->buildWaitTime = 10;
-                    $cache->buildWaitCount = 5;
+                    $cache->lockEnabled = true;
+                    $cache->lockTimeoutMode = 1;
+                    $cache->lockRetryInterval = 10;
+                    $cache->lockRetryCount = 5;
                     $cache->valueFunc = function ($params) {
                         return 'test_lock';
                     };
@@ -498,10 +498,10 @@ class CacheHubTest extends TestCase
             for ($i = 0; $i < 5; $i++) {
                 \Swoole\Coroutine::create(function () use ($wg, $i, &$fromArr, $cacheHub) {
                     $cache = $cacheHub->getCache(TestCache2::class, true);
-                    $cache->buildLock = false;
-                    $cache->buildWaitMode = 1;
-                    $cache->buildWaitTime = 10;
-                    $cache->buildWaitCount = 5;
+                    $cache->lockEnabled = false;
+                    $cache->lockTimeoutMode = 1;
+                    $cache->lockRetryInterval = 10;
+                    $cache->lockRetryCount = 5;
                     $cache->valueFunc = function ($params) {
                         return 'test_lock';
                     };
@@ -536,10 +536,10 @@ class CacheHubTest extends TestCase
                 $wg->add();
                 \Swoole\Coroutine::create(function () use ($wg, $i, &$fromArr, $cacheHub) {
                     $cache = $cacheHub->getCache(TestCache2::class, true);
-                    $cache->buildLock = true;
-                    $cache->buildWaitMode = 1;
-                    $cache->buildWaitTime = 10;
-                    $cache->buildWaitCount = 5;
+                    $cache->lockEnabled = true;
+                    $cache->lockTimeoutMode = 1;
+                    $cache->lockRetryInterval = 10;
+                    $cache->lockRetryCount = 5;
                     $cache->valueFunc = function ($params) {
                         sleep(1);
                         return 'test_lock';
@@ -577,10 +577,10 @@ class CacheHubTest extends TestCase
                 \Swoole\Coroutine::create(function () use ($wg, $i, &$fromArr, &$isTimeout, $cacheHub) {
                     try {
                         $cache = $cacheHub->getCache(TestCache2::class, true);
-                        $cache->buildLock = true;
-                        $cache->buildWaitMode = 2;
-                        $cache->buildWaitTime = 10;
-                        $cache->buildWaitCount = 5;
+                        $cache->lockEnabled = true;
+                        $cache->lockTimeoutMode = 2;
+                        $cache->lockRetryInterval = 10;
+                        $cache->lockRetryCount = 5;
                         $cache->valueFunc = function ($params) {
                             sleep(1);
                             return 'test_lock';

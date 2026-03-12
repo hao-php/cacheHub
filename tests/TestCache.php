@@ -13,7 +13,7 @@ class TestCache extends AbstractMultiCache
 {
 
     public $key = 'test';
-    public $isCacheNull = true;
+    public $cacheNull = true;
     public $nullValue = '';
     public $valueFunc;
     public $wrapFunc;
@@ -56,7 +56,7 @@ class TestCache2 extends AbstractMultiCache
 {
 
     public $key = 'test';
-    public $isCacheNull = true;
+    public $cacheNull = true;
     public $nullValue = '';
     public $valueFunc;
     public $wrapFunc;
@@ -111,7 +111,7 @@ class TestRepeatedCache extends AbstractMultiCache
 {
 
     public $key = 'test';
-    public $isCacheNull = true;
+    public $cacheNull = true;
     public $nullValue = '';
     public $valueFunc;
 

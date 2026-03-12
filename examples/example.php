@@ -29,9 +29,9 @@ class ExTest extends AbstractMultiCache
 {
 
     public $key = "ex_test";
-    public $buildLock = true;
+    public $lockEnabled = true;
 
-    public $isCacheNull = true;
+    public $cacheNull = true;
 
     public function getLevels(): array
     {
