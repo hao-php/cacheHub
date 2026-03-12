@@ -28,13 +28,13 @@ class ApcuDriver extends AbstractDriver
 
     public function multiGet(array $keys): array
     {
+        $values = apcu_fetch($keys);
         $data = [];
         foreach ($keys as $key) {
-            $value = apcu_fetch($key);
-            if (Utils::isMiss($value)) {
+            if (!array_key_exists($key, $values)) {
                 $data[$key] = null;
             } else {
-                $data[$key] = $this->serializer->decode($value);
+                $data[$key] = $this->serializer->decode($values[$key]);
             }
         }
         return $data;

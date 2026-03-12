@@ -341,32 +341,32 @@ class CacheEngine
         $levels = $cache->getLevels();
         $this->validateLevels($levels);
 
-        $keyParamsArrTmp = $keyParamsArr;
-        $result = [];
-        $pendingWrites = [];
-        $source = [];
+        $remaining = $keyParamsArr;  // 尚未命中的 keyParams，逐级递减
+        $result = [];                // keyParams => data，已命中的结果
+        $source = [];                // keyParams => driver class|'build'，数据来源
+        $pendingWrites = [];         // 需要回写的层级信息
+
+        // 逐级查询，命中的记入 result，未命中的传给下一级
         foreach ($levels as $level) {
             $driver = $this->getDriver($level);
 
-            $keys = [];
+            // cacheKey => keyParams 映射，用于反查
             $keyMap = [];
-            foreach ($keyParamsArrTmp as $keyParams) {
-                $key = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
-                $keys[] = $key;
-                $keyMap[$key] = $keyParams;
+            foreach ($remaining as $keyParams) {
+                $cacheKey = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
+                $keyMap[$cacheKey] = $keyParams;
             }
 
-            $keyParamsArrTmp = [];
-            $dataArr = $driver->multiGet($keys);
-            $missedKeys = [];
-            foreach ($dataArr as $dKey => $value) {
+            $remaining = [];
+            $missedKeys = [];  // cacheKey => keyParams，本级未命中的
+            foreach ($driver->multiGet(array_keys($keyMap)) as $cacheKey => $value) {
                 list($hit, $value) = $this->resolveCacheData($cache, $value);
-                if (!$hit) {
-                    $keyParamsArrTmp[] = $keyMap[$dKey];
-                    $missedKeys[$dKey] = $keyMap[$dKey];
+                if ($hit) {
+                    $result[$keyMap[$cacheKey]] = $value;
+                    $source[$keyMap[$cacheKey]] = $level->driver;
                 } else {
-                    $result[$keyMap[$dKey]] = $value;
-                    $source[$keyMap[$dKey]] = $level->driver;
+                    $remaining[] = $keyMap[$cacheKey];
+                    $missedKeys[$cacheKey] = $keyMap[$cacheKey];
                 }
             }
 
@@ -381,46 +381,44 @@ class CacheEngine
             }
         }
 
-        if (!empty($keyParamsArrTmp)) {
-            $data = $cache->multiBuild($keyParamsArrTmp);
-            foreach ($data as $keyParams => $vv) {
+        // 剩余未命中的，调用 multiBuild 构建
+        if (!empty($remaining)) {
+            $builtData = $cache->multiBuild($remaining);
+            foreach ($builtData as $keyParams => $value) {
+                $result[$keyParams] = $value;
                 $source[$keyParams] = 'build';
-                $result[$keyParams] = $vv;
             }
         }
 
+        // 从最后一级往前回写
         for ($i = count($pendingWrites) - 1; $i >= 0; $i--) {
             $pw = $pendingWrites[$i];
             /** @var AbstractDriver $driver */
             $driver = $pw['driver'];
-            $missedKeys = $pw['missed_keys'];
 
-            $saveData = [];
-            foreach ($missedKeys as $key => $keyParams) {
+            $writeItems = [];
+            foreach ($pw['missed_keys'] as $cacheKey => $keyParams) {
                 $data = $result[$keyParams] ?? null;
                 if (!$this->isEmptyData($data)) {
-                    $saveData[$key] = $this->wrapDataVersion($cache, $data);
+                    $writeItems[$cacheKey] = $this->wrapDataVersion($cache, $data);
                 }
             }
 
-            if (!empty($saveData)) {
+            if (!empty($writeItems)) {
                 $ttl = $pw['ttl'];
                 if ($ttl <= 0) {
                     $ttl = CacheHub::DEFAULT_TTL;
                 }
-                $driver->multiSet($saveData, $ttl);
+                $driver->multiSet($writeItems, $ttl);
             }
         }
 
-        $arr = [];
-        foreach ($keyParamsArr as $key) {
-            if (isset($result[$key])) {
-                $arr[$key] = $cache->wrapData($result[$key]);
-            } else {
-                $arr[$key] = null;
-            }
+        // 按原始顺序组装输出，未命中的填 null
+        $output = [];
+        foreach ($keyParamsArr as $keyParams) {
+            $output[$keyParams] = isset($result[$keyParams]) ? $cache->wrapData($result[$keyParams]) : null;
         }
-        return ['data' => $arr, 'source' => $source];
+        return ['data' => $output, 'source' => $source];
     }
 
     /**
