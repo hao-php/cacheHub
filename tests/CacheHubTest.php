@@ -23,7 +23,7 @@ class CacheHubTest extends TestCase
         $cache->key = '';
         try {
             $cache->get();
-        } catch (\Haoa\CacheHub\Exception\Exception $e) {
+        } catch (\Haoa\CacheHub\Exception\CacheException $e) {
             $this->assertEquals('key is empty', $e->getMessage());
         }
     }

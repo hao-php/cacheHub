@@ -3,10 +3,9 @@ declare(strict_types=1);
 
 namespace Haoa\CacheHub\Driver;
 
-use Haoa\CacheHub\Common\Common;
-use Haoa\CacheHub\Exception\Exception;
+use Haoa\CacheHub\Common\Utils;
 
-class ApcuDriver extends BaseDriver
+class ApcuDriver extends AbstractDriver
 {
 
     protected bool $canLock = false;
@@ -21,7 +20,7 @@ class ApcuDriver extends BaseDriver
     public function get($key)
     {
         $value = apcu_fetch($key);
-        if (Common::checkEmpty($value)) {
+        if (Utils::checkEmpty($value)) {
             return null;
         }
         return $this->serializer->decode($value);
@@ -32,10 +31,10 @@ class ApcuDriver extends BaseDriver
         $data = [];
         foreach ($keyArr as $key) {
             $value = apcu_fetch($key);
-            if (Common::checkEmpty($value)) {
+            if (Utils::checkEmpty($value)) {
                 $data[$key] = null;
             } else {
-                $data[$key] =  $this->serializer->decode($value);;
+                $data[$key] = $this->serializer->decode($value);
             }
         }
         return $data;
@@ -44,7 +43,7 @@ class ApcuDriver extends BaseDriver
     public function set($key, $value, $ttl = null): bool
     {
         $value = $this->serializer->encode($value);
-        if (Common::checkEmpty($value)) {
+        if (Utils::checkEmpty($value)) {
             return false;
         }
         return (bool)apcu_store($key, $value, (int)$ttl);
@@ -54,14 +53,14 @@ class ApcuDriver extends BaseDriver
     {
         foreach ($params as $key => $value) {
             $value = $this->serializer->encode($value);
-            if (!Common::checkEmpty($value)) {
+            if (!Utils::checkEmpty($value)) {
                 apcu_store($key, $value, $ttl);
             }
         }
         return true;
     }
 
-    public function delete(string $key):bool
+    public function delete(string $key): bool
     {
         return (bool)apcu_delete($key);
     }

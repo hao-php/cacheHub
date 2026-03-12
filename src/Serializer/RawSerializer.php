@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Haoa\CacheHub\Serializer;
 
-class OriginalSerializer implements SerializerInterface
+class RawSerializer implements SerializerInterface
 {
 
     public function encode($data)

@@ -3,35 +3,80 @@ declare(strict_types=1);
 
 namespace Haoa\CacheHub;
 
-use Haoa\CacheHub\Common\Common;
-use Haoa\CacheHub\Driver\BaseDriver;
-use Haoa\CacheHub\Exception\Exception;
-use Haoa\CacheHub\Locker\Locker;
-use Haoa\CacheHub\Serializer\OriginalSerializer;
+use Haoa\CacheHub\Common\Utils;
+use Haoa\CacheHub\Driver\AbstractDriver;
+use Haoa\CacheHub\Exception\CacheException;
+use Haoa\CacheHub\Locker\LockInterface;
+use Haoa\CacheHub\Serializer\RawSerializer;
+use Haoa\CacheHub\Serializer\SerializerInterface;
 
 class CacheEngine
 {
 
-    protected Container $container;
-
-    /** @var Locker|null */
+    /** @var LockInterface|null */
     protected $locker;
 
     protected string $prefix;
 
-    public function __construct(Container $container, $locker, string $prefix)
+    protected ?LoggerInterface $logger;
+
+    protected array $driverObjs = [];
+
+    protected array $serializerObjs = [];
+
+    public function __construct($locker, string $prefix, ?LoggerInterface $logger = null)
     {
-        $this->container = $container;
         $this->locker = $locker;
         $this->prefix = $prefix;
+        $this->logger = $logger;
+    }
+
+    protected function getDriver($class, $serializerClass, $handler = null): AbstractDriver
+    {
+        if (!isset($this->driverObjs[$class])) {
+            $this->driverObjs[$class] = new $class;
+            if (!$this->driverObjs[$class] instanceof AbstractDriver) {
+                throw new CacheException("driver[{$class}] must be of type " . AbstractDriver::class);
+            }
+            $this->driverObjs[$class]->setHandler($handler);
+            $this->driverObjs[$class]->setSerializer($this->getSerializer($serializerClass));
+        }
+        return $this->driverObjs[$class];
+    }
+
+    protected function getSerializer($class): SerializerInterface
+    {
+        if (!isset($this->serializerObjs[$class])) {
+            $this->serializerObjs[$class] = new $class;
+            if (!$this->serializerObjs[$class] instanceof SerializerInterface) {
+                throw new CacheException("serializer[{$class}] must be of type " . SerializerInterface::class);
+            }
+        }
+        return $this->serializerObjs[$class];
     }
 
     protected function getKey(AbstractMultiCache $cache): string
     {
         if (empty($cache->key)) {
-            throw new Exception("key is empty");
+            throw new CacheException("key is empty");
         }
         return $cache->key;
+    }
+
+    protected function buildLockKey($prefix, $key, $keyParams): string
+    {
+        $str = '';
+        if (!empty($keyParams)) {
+            if (!is_array($keyParams)) {
+                $keyParams = [$keyParams];
+            }
+            $str = implode('_', $keyParams);
+        }
+        $key = $prefix . $key;
+        if (!empty($str)) {
+            $key .= ':' . $str;
+        }
+        return $key . '_lock';
     }
 
     protected function checkDataVersion(AbstractMultiCache $cache, &$data)
@@ -57,7 +102,7 @@ class CacheEngine
         ];
     }
 
-    protected function cacheEmptyValue(AbstractMultiCache $cache, BaseDriver $driver, $key, $nullTtl)
+    protected function cacheEmptyValue(AbstractMultiCache $cache, AbstractDriver $driver, $key, $nullTtl)
     {
         if (!$cache->isCacheNull) {
             return true;
@@ -79,7 +124,7 @@ class CacheEngine
 
     protected function parseCacheData(AbstractMultiCache $cache, $data)
     {
-        if (!Common::checkEmpty($data) && $data !== '' && $this->checkDataVersion($cache, $data)) {
+        if (!Utils::checkEmpty($data) && $data !== '' && $this->checkDataVersion($cache, $data)) {
             return [true, $data];
         }
 
@@ -90,9 +135,9 @@ class CacheEngine
         return [false, null];
     }
 
-    protected function setBuildData(AbstractMultiCache $cache, BaseDriver $driver, $key, $data, $ttl, $nullTtl)
+    protected function setBuildData(AbstractMultiCache $cache, AbstractDriver $driver, $key, $data, $ttl, $nullTtl)
     {
-        if ($data === '' || Common::checkEmpty($data)) {
+        if ($data === '' || Utils::checkEmpty($data)) {
             $data = null;
             return $this->cacheEmptyValue($cache, $driver, $key, $nullTtl);
         }
@@ -105,19 +150,19 @@ class CacheEngine
         return (bool)$driver->set($key, $data, $ttl);
     }
 
-    protected function lockGetData(AbstractMultiCache $cache, BaseDriver $driver, $key, $keyParams, &$stack): array
+    protected function lockGetData(AbstractMultiCache $cache, AbstractDriver $driver, $key, $keyParams, &$stack): array
     {
         if (!$cache->buildLock || empty($cache->buildWaitCount) || $cache->buildWaitCount <= 0) {
             return [false, null];
         }
         if (empty($this->locker)) {
-            throw new Exception('locker is empty');
+            throw new CacheException('locker is empty');
         }
-        $lockKey = $this->locker->getLockKey($this->prefix, $this->getKey($cache), $keyParams);
+        $lockKey = $this->buildLockKey($this->prefix, $this->getKey($cache), $keyParams);
         $lockExpireTime = (int)round($cache->buildWaitCount * $cache->buildWaitTime / 1000) + 10;
 
         if ($this->locker->tryLock($lockKey, 1, $lockExpireTime)) {
-            Common::stackDefer($stack, function () use ($lockKey) {
+            Utils::stackDefer($stack, function () use ($lockKey) {
                 $this->locker->unLock($lockKey);
             });
             return [false, null];
@@ -137,7 +182,7 @@ class CacheEngine
         }
 
         if ($cache->buildWaitMod == 2) {
-            throw new Exception("build data timeout");
+            throw new CacheException("build data timeout");
         }
 
         return [false, null];
@@ -164,8 +209,8 @@ class CacheEngine
                 if (empty($v['driver'])) {
                     throw new \Exception('driver is empty');
                 }
-                $serializerClass = $v['serializer'] ?: OriginalSerializer::class;
-                $driver = $this->container->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
+                $serializerClass = $v['serializer'] ?: RawSerializer::class;
+                $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
 
                 $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
 
@@ -199,8 +244,8 @@ class CacheEngine
                 if (empty($v['driver'])) {
                     throw new \Exception('driver is empty');
                 }
-                $serializerClass = $v['serializer'] ?: OriginalSerializer::class;
-                $driver = $this->container->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
+                $serializerClass = $v['serializer'] ?: RawSerializer::class;
+                $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
                 $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
 
                 $setDrivers[] = [
@@ -220,15 +265,15 @@ class CacheEngine
         $setLen = count($setDrivers);
         if ($setLen > 0) {
             for ($i = $setLen - 1; $i >= 0; $i--) {
-                /** @var BaseDriver $driver */
+                /** @var AbstractDriver $driver */
                 $driver = $setDrivers[$i]['driver'];
                 $key = $setDrivers[$i]['key'];
                 $driverClass = $setDrivers[$i]['driver_class'];
                 $ret = $this->setBuildData($cache, $driver, $key, $data, $setDrivers[$i]['ttl'], $setDrivers[$i]['null_ttl']);
                 if (!$ret) {
-                    $this->container->getLogger() and $this->container->getLogger()->error("key:{$key}, {$driverClass} fail to set");
+                    $this->logger and $this->logger->error("key:{$key}, {$driverClass} fail to set");
                 } else {
-                    $this->container->getLogger() and $this->container->getLogger()->debug("key:{$key}, {$driverClass} set successfully");
+                    $this->logger and $this->logger->debug("key:{$key}, {$driverClass} set successfully");
                 }
             }
         }
@@ -253,8 +298,8 @@ class CacheEngine
             if (empty($v['driver'])) {
                 throw new \Exception('driver is empty');
             }
-            $serializerClass = $v['serializer'] ?: OriginalSerializer::class;
-            $driver = $this->container->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
+            $serializerClass = $v['serializer'] ?: RawSerializer::class;
+            $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
 
             $keyArr = [];
             $keyMap = [];
@@ -300,14 +345,14 @@ class CacheEngine
         $len = count($setDrivers);
         if ($len > 0) {
             for ($i = $len - 1; $i >= 0; $i--) {
-                /** @var BaseDriver $driver */
+                /** @var AbstractDriver $driver */
                 $driver = $setDrivers[$i]['driver'];
                 $keyArr = $setDrivers[$i]['key_arr'];
 
                 $saveData = [];
                 foreach ($keyArr as $key => $keyParams) {
                     $data = $result[$keyParams] ?? null;
-                    if (!Common::checkEmpty($data)) {
+                    if (!Utils::checkEmpty($data)) {
                         $saveData[$key] = $this->addDataVersion($cache, $data);
                     }
                 }
@@ -343,16 +388,16 @@ class CacheEngine
             if (empty($v['driver'])) {
                 throw new \Exception('driver is empty');
             }
-            $serializerClass = $v['serializer'] ?: OriginalSerializer::class;
-            $driver = $this->container->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
+            $serializerClass = $v['serializer'] ?: RawSerializer::class;
+            $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
 
             $key = $driver->buildKey($this->prefix, $this->getKey($cache), $keyParams);
             $ret = $this->setBuildData($cache, $driver, $key, $data, $v['ttl'] ?? 0, $v['null_ttl'] ?? 0);
             if (!$ret) {
-                $this->container->getLogger() and $this->container->getLogger()->error("key:{$key}, " . $v['driver'] . " fail to set");
+                $this->logger and $this->logger->error("key:{$key}, " . $v['driver'] . " fail to set");
             } else {
                 $successNum++;
-                $this->container->getLogger() and $this->container->getLogger()->debug("key:{$key}, " . $v['driver'] . " set successfully");
+                $this->logger and $this->logger->debug("key:{$key}, " . $v['driver'] . " set successfully");
             }
         }
 
@@ -367,8 +412,8 @@ class CacheEngine
         if (count($cache->getCacheList()) == 1) {
             $cacheList = $cache->getCacheList();
             $v = reset($cacheList);
-            $serializerClass = $v['serializer'] ?? OriginalSerializer::class;
-            $driver = $this->container->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
+            $serializerClass = $v['serializer'] ?? RawSerializer::class;
+            $driver = $this->getDriver($v['driver'], $serializerClass, $v['driver_handler'] ?? null);
 
             return call_user_func_array([$driver, $name], $arguments);
         }

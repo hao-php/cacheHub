@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Haoa\CacheHub\Common;
 
-class Common
+class Utils
 {
 
     public static function checkEmpty($data)
@@ -14,7 +14,7 @@ class Common
 
     /**
      * 在方法结束的时候调用$callback, 注意: 当$stack变量被销毁的时候触发回调
-     * @param SplStack|null $stack
+     * @param \SplStack|null $stack
      * @param callable $callback
      * @return void
      */

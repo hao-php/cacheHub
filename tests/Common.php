@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 use Haoa\CacheHub\CacheHub;
-use Haoa\CacheHub\Locker\RedisLocker;
+use Haoa\CacheHub\Locker\RedisLock;
 
 class Common
 {
@@ -26,7 +26,7 @@ class Common
 
         $cacheHub = new CacheHub();
         $cacheHub->setPrefix('unit_test:');
-        $locker = new RedisLocker($redis);
+        $locker = new RedisLock($redis);
         $cacheHub->setLocker($locker);
         return $cacheHub;
     }

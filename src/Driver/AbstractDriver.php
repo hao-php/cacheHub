@@ -3,10 +3,10 @@ declare(strict_types=1);
 
 namespace Haoa\CacheHub\Driver;
 
-use Haoa\CacheHub\Exception\Exception;
+use Haoa\CacheHub\Exception\CacheException;
 use Haoa\CacheHub\Serializer\SerializerInterface;
 
-abstract class BaseDriver
+abstract class AbstractDriver
 {
 
     protected $handler;
@@ -49,7 +49,7 @@ abstract class BaseDriver
     public function getHandler()
     {
         if (empty($this->handler)) {
-            throw new Exception('handler is empty');
+            throw new CacheException('handler is empty');
         }
         return $this->handler;
     }

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Haoa\CacheHub\Locker;
 
-class RedisLocker extends Locker
+class RedisLock implements LockInterface
 {
 
     /**
@@ -21,15 +21,14 @@ class RedisLocker extends Locker
         return $this->redis->set($key, $value, ['nx', 'ex' => $expire]);
     }
 
-    public function unLock($key): bool
+    public function unLock(string $key): bool
     {
         return (bool)$this->redis->del($key);
     }
 
-    public function isLocked($key): bool
+    public function isLocked(string $key): bool
     {
         return !empty($this->redis->get($key));
     }
-
 
 }

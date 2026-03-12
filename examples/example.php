@@ -4,9 +4,9 @@ use Haoa\CacheHub\AbstractMultiCache;
 use Haoa\CacheHub\CacheHub;
 use Haoa\CacheHub\Driver\ApcuDriver;
 use Haoa\CacheHub\Driver\RedisDriver as RedisDriver;
-use Haoa\CacheHub\Locker\RedisLocker;
+use Haoa\CacheHub\Locker\RedisLock;
 use Haoa\CacheHub\Serializer\JsonSerializer;
-use Haoa\CacheHub\Serializer\OriginalSerializer;
+use Haoa\CacheHub\Serializer\RawSerializer;
 
 require __DIR__ . '/autoload.php';
 
@@ -41,7 +41,7 @@ class ExTest extends AbstractMultiCache
         return [
             [
                 'driver' => ApcuDriver::class,
-                'serializer' => OriginalSerializer::class, // default
+                'serializer' => RawSerializer::class,
                 'ttl' => 5,
             ],
             [
@@ -101,7 +101,7 @@ class AppCacheHub
         $cacheHub->setPrefix('ex:');
 
         // 注入redis锁
-        $locker = new RedisLocker($redis);
+        $locker = new RedisLock($redis);
         $cacheHub->setLocker($locker);
         $cacheHub->setLogger(new Logger());
 

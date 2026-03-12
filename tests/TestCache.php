@@ -6,7 +6,7 @@ use Haoa\CacheHub\AbstractMultiCache;
 use Haoa\CacheHub\Driver\ApcuDriver;
 use Haoa\CacheHub\Driver\RedisDriver;
 use Haoa\CacheHub\Serializer\JsonSerializer;
-use Haoa\CacheHub\Serializer\OriginalSerializer;
+use Haoa\CacheHub\Serializer\RawSerializer;
 
 class TestCache extends AbstractMultiCache
 {
@@ -92,7 +92,7 @@ class TestCache2 extends AbstractMultiCache
         return [
             [
                 'driver' => ApcuDriver::class,
-                'serializer' => OriginalSerializer::class, // default
+                'serializer' => RawSerializer::class, // default
                 'null_ttl' => 5,
                 'ttl' => 5,
             ],
@@ -120,7 +120,7 @@ class TestRepeatedCache extends AbstractMultiCache
         return [
             [
                 'driver' => ApcuDriver::class,
-                'serializer' => OriginalSerializer::class, // default
+                'serializer' => RawSerializer::class, // default
                 'null_ttl' => 5,
                 'ttl' => 5,
             ],

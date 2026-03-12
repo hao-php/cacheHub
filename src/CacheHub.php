@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace Haoa\CacheHub;
 
-use Haoa\CacheHub\Exception\Exception;
-use Haoa\CacheHub\Locker\Locker;
+use Haoa\CacheHub\Exception\CacheException;
+use Haoa\CacheHub\Locker\LockInterface;
 
 class CacheHub
 {
@@ -16,21 +16,17 @@ class CacheHub
     /** @var CacheProxy[] */
     protected $cacheObjs = [];
 
-    /** @var Locker 用于构建缓存时的锁 */
+    /** @var LockInterface|null 用于构建缓存时的锁 */
     protected $locker;
 
-    protected Container $container;
+    /** @var LoggerInterface|null */
+    protected $logger;
 
     /** 缓存前缀 */
     protected $prefix = 'cachehub:';
 
     private ?CacheEngine $engine = null;
 
-
-    public function __construct()
-    {
-        $this->container = new Container();
-    }
 
     /**
      * @return string
@@ -49,7 +45,7 @@ class CacheHub
         $this->engine = null;
     }
 
-    public function setLocker(Locker $locker)
+    public function setLocker(LockInterface $locker)
     {
         $this->locker = $locker;
         $this->engine = null;
@@ -57,13 +53,14 @@ class CacheHub
 
     public function setLogger(LoggerInterface $logger)
     {
-        $this->container->setLogger($logger);
+        $this->logger = $logger;
+        $this->engine = null;
     }
 
     protected function getEngine(): CacheEngine
     {
         if ($this->engine === null) {
-            $this->engine = new CacheEngine($this->container, $this->locker, $this->prefix);
+            $this->engine = new CacheEngine($this->locker, $this->prefix, $this->logger);
         }
         return $this->engine;
     }
@@ -75,7 +72,7 @@ class CacheHub
         }
         $cache = new $cacheClass;
         if (!$cache instanceof AbstractMultiCache) {
-            throw new Exception("{$cacheClass} must be of type " . AbstractMultiCache::class);
+            throw new CacheException("{$cacheClass} must be of type " . AbstractMultiCache::class);
         }
         $proxy = new CacheProxy($this->getEngine(), $cache);
         $this->cacheObjs[$cacheClass] = $proxy;
