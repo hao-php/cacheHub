@@ -25,3 +25,6 @@ phpunit.phar
 /phpunit.xml
 
 /vendor
+
+# test config file
+/tests/config.php
