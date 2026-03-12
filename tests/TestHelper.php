@@ -4,7 +4,7 @@ declare(strict_types=1);
 use Haoa\CacheHub\CacheHub;
 use Haoa\CacheHub\Locker\RedisLock;
 
-class Common
+class TestHelper
 {
 
     /**
@@ -18,7 +18,7 @@ class Common
         return $redis;
     }
 
-    public static function getCacheHub($redis = null)
+    public static function getCacheHub($redis = null): CacheHub
     {
         if (empty($redis)) {
             $redis = self::getRedis();
