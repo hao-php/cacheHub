@@ -434,7 +434,7 @@ class CacheHubTest extends TestCase
         $cacheHub = Common::getCacheHub($redis);
         $cache = $cacheHub->getCache(TestCache2::class);
         $cache->buildLock = true;
-        $cache->buildWaitMod = 1;
+        $cache->buildWaitMode = 1;
         $cache->buildWaitTime = 10;
         $cache->buildWaitCount = 5;
         $cache->valueFunc = function ($params) {
@@ -456,7 +456,7 @@ class CacheHubTest extends TestCase
                 \Swoole\Coroutine::create(function () use ($wg, $i, &$fromArr, $cacheHub) {
                     $cache = $cacheHub->getCache(TestCache2::class, true);
                     $cache->buildLock = true;
-                    $cache->buildWaitMod = 1;
+                    $cache->buildWaitMode = 1;
                     $cache->buildWaitTime = 10;
                     $cache->buildWaitCount = 5;
                     $cache->valueFunc = function ($params) {
@@ -499,7 +499,7 @@ class CacheHubTest extends TestCase
                 \Swoole\Coroutine::create(function () use ($wg, $i, &$fromArr, $cacheHub) {
                     $cache = $cacheHub->getCache(TestCache2::class, true);
                     $cache->buildLock = false;
-                    $cache->buildWaitMod = 1;
+                    $cache->buildWaitMode = 1;
                     $cache->buildWaitTime = 10;
                     $cache->buildWaitCount = 5;
                     $cache->valueFunc = function ($params) {
@@ -537,7 +537,7 @@ class CacheHubTest extends TestCase
                 \Swoole\Coroutine::create(function () use ($wg, $i, &$fromArr, $cacheHub) {
                     $cache = $cacheHub->getCache(TestCache2::class, true);
                     $cache->buildLock = true;
-                    $cache->buildWaitMod = 1;
+                    $cache->buildWaitMode = 1;
                     $cache->buildWaitTime = 10;
                     $cache->buildWaitCount = 5;
                     $cache->valueFunc = function ($params) {
@@ -578,7 +578,7 @@ class CacheHubTest extends TestCase
                     try {
                         $cache = $cacheHub->getCache(TestCache2::class, true);
                         $cache->buildLock = true;
-                        $cache->buildWaitMod = 2;
+                        $cache->buildWaitMode = 2;
                         $cache->buildWaitTime = 10;
                         $cache->buildWaitCount = 5;
                         $cache->valueFunc = function ($params) {

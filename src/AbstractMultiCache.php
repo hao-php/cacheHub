@@ -21,14 +21,14 @@ abstract class AbstractMultiCache
     /**  数据版本号, 当addVersion=true时生效 */
     public $version = 1;
 
-    /** 构建数据, 当遇到锁重试次数, 需要buildLock=true */
+    /** 加锁等待重试次数，需要 buildLock=true */
     public $buildWaitCount = 3;
 
-    /** 构建数据, 当遇到锁重试时间间隔, 毫秒 */
+    /** 加锁等待重试间隔，毫秒 */
     public $buildWaitTime = 100;
 
-    /** 构建数据超时处理模式, 1:放行到build, 2:抛出异常 */
-    public $buildWaitMod = 1;
+    /** 等待超时处理模式：1=放行到 build，2=抛出异常 */
+    public $buildWaitMode = 1;
 
     /** build数据时是否加锁 */
     public $buildLock = false;

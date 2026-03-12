@@ -228,7 +228,7 @@ class CacheEngine
      */
     protected function tryLockAndWait(AbstractMultiCache $cache, AbstractDriver $driver, $key, $keyParams, &$stack): array
     {
-        if (!$cache->buildLock || empty($cache->buildWaitCount) || $cache->buildWaitCount <= 0) {
+        if (!$cache->buildLock || $cache->buildWaitCount <= 0) {
             return [false, null];
         }
         if (empty($this->locker)) {
@@ -244,20 +244,22 @@ class CacheEngine
             return [false, null];
         }
 
+        $sleepUs = $cache->buildWaitTime * 1000;
         for ($i = 0; $i < $cache->buildWaitCount; $i++) {
+            usleep($sleepUs);
+
             $data = $driver->get($key);
-            list($parseRet, $data) = $this->resolveCacheData($cache, $data);
-            if ($parseRet) {
+            list($hit, $data) = $this->resolveCacheData($cache, $data);
+            if ($hit) {
                 return [true, $data];
             }
 
-            $isLocked = $this->locker->isLocked($lockKey);
-            if (!$isLocked) {
+            if (!$this->locker->isLocked($lockKey)) {
                 return [false, null];
             }
         }
 
-        if ($cache->buildWaitMod == 2) {
+        if ($cache->buildWaitMode == 2) {
             throw new CacheException("build data timeout");
         }
 
