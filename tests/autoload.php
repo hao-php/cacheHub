@@ -12,3 +12,8 @@ spl_autoload_register(function($class) {
         }
     }
 });
+
+\Swoole\Coroutine::set([
+    'hook_flags' => SWOOLE_HOOK_ALL,
+    'log_level' => SWOOLE_LOG_WARNING,
+]);
