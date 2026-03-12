@@ -268,7 +268,7 @@ class CacheEngine
 
     /**
      * 获取缓存数据，未命中时自动 build 并回写
-     * @return array{data: mixed, dataFrom: string}
+     * @return array{data: mixed, source: string}
      */
     public function get(AbstractMultiCache $cache, $keyParams = '', $refresh = false): array
     {
@@ -279,7 +279,7 @@ class CacheEngine
         $index = 0;
         $data = null;
         $hit = false;
-        $dataFrom = '';
+        $source = '';
 
         foreach ($levels as $level) {
             $index++;
@@ -290,7 +290,7 @@ class CacheEngine
                 $data = $driver->get($key);
                 list($hit, $data) = $this->resolveCacheData($cache, $data);
                 if ($hit) {
-                    $dataFrom = $level->driver;
+                    $source = $level->driver;
                     break;
                 }
 
@@ -299,7 +299,7 @@ class CacheEngine
                     $stack = new \SplStack();
                     list($hit, $data) = $this->tryLockAndWait($cache, $driver, $key, $keyParams, $stack);
                     if ($hit) {
-                        $dataFrom = $level->driver;
+                        $source = $level->driver;
                         break;
                     }
                 }
@@ -316,7 +316,7 @@ class CacheEngine
 
         if (!$hit) {
             $data = $cache->build($keyParams);
-            $dataFrom = 'build';
+            $source = 'build';
         }
 
         for ($i = count($pendingWrites) - 1; $i >= 0; $i--) {
@@ -329,12 +329,12 @@ class CacheEngine
             }
         }
 
-        return ['data' => $cache->wrapData($data), 'dataFrom' => $dataFrom];
+        return ['data' => $cache->wrapData($data), 'source' => $source];
     }
 
     /**
      * 批量获取缓存数据，未命中的自动 multiBuild 并回写
-     * @return array{data: array, dataFrom: array}
+     * @return array{data: array, source: array}
      */
     public function multiGet(AbstractMultiCache $cache, array $keyParamsArr): array
     {
@@ -344,7 +344,7 @@ class CacheEngine
         $keyParamsArrTmp = $keyParamsArr;
         $result = [];
         $pendingWrites = [];
-        $dataFrom = [];
+        $source = [];
         foreach ($levels as $level) {
             $driver = $this->getDriver($level);
 
@@ -366,7 +366,7 @@ class CacheEngine
                     $emptyKeyArr[$dKey] = $keyMap[$dKey];
                 } else {
                     $result[$keyMap[$dKey]] = $value;
-                    $dataFrom[$keyMap[$dKey]] = $level->driver;
+                    $source[$keyMap[$dKey]] = $level->driver;
                 }
             }
 
@@ -384,7 +384,7 @@ class CacheEngine
         if (!empty($keyParamsArrTmp)) {
             $data = $cache->multiBuild($keyParamsArrTmp);
             foreach ($data as $keyParams => $vv) {
-                $dataFrom[$keyParams] = 'build';
+                $source[$keyParams] = 'build';
                 $result[$keyParams] = $vv;
             }
         }
@@ -420,7 +420,7 @@ class CacheEngine
                 $arr[$key] = null;
             }
         }
-        return ['data' => $arr, 'dataFrom' => $dataFrom];
+        return ['data' => $arr, 'source' => $source];
     }
 
     /**

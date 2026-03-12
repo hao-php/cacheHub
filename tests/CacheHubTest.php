@@ -75,8 +75,8 @@ class CacheHubTest extends TestCase
             return 'test';
         };
         $data = $cache->get();
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals('build', $from);
         $key = 'unit_test:test_string';
         $exists = (bool)$redis->exists($key);
@@ -84,15 +84,15 @@ class CacheHubTest extends TestCase
         $ttl = $redis->ttl($key);
 
         $cache->get();
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals(RedisDriver::class, $from);
         $this->assertTrue(($ttl <= 60 && $ttl > 0));
         $this->assertEquals('test', $data);
 
         $cache->get('', true);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals('build', $from);
 
         $data = $cache->get(1);
@@ -159,16 +159,16 @@ class CacheHubTest extends TestCase
             return $data;
         };
         $data = $cache->multiGet(['test1', 'test2']);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
 
         $this->assertEquals(['test1' => ['test1_data'], 'test2' => ['test2_data']], $data);
         $this->assertEquals(['test1' => 'build', 'test2' => 'build'], $from);
 
         apcu_delete("unit_test:test_multi_get:test1");
         $data = $cache->multiGet(['test1', 'test2']);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals(['test1' => RedisDriver::class, 'test2' => ApcuDriver::class], $from);
 
         $redis->flushDB();
@@ -261,8 +261,8 @@ class CacheHubTest extends TestCase
 
         $data = $cache->get(1);
 
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals('build', $from);
 
         $key = 'unit_test:test_array:1';
@@ -273,8 +273,8 @@ class CacheHubTest extends TestCase
         $this->assertEquals('cachehub_json:["test_1"]', $cacheData);
 
         $cache->get();
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals(RedisDriver::class, $from);
 
         $this->assertTrue(($ttl <= 60 && $ttl > 0));
@@ -314,16 +314,16 @@ class CacheHubTest extends TestCase
         $key = 'unit_test:test_null';
         $data = $cache->get();
         $this->assertEquals('', $data);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals('build', $from);
         $ttl = $redis->ttl($key);
         $this->assertTrue(($ttl <= 60 && $ttl > 0));
 
         $data = $cache->get();
         $this->assertNull($data);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals(RedisDriver::class, $from);
 
 
@@ -333,8 +333,8 @@ class CacheHubTest extends TestCase
         $cacheData = $redis->get($key);
         $this->assertEquals('cachehub_null', $cacheData);
         $this->assertEquals('', $data);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals('build', $from);
 
         $redis->flushDB();
@@ -346,15 +346,15 @@ class CacheHubTest extends TestCase
         $this->assertNull($data);
         $exists = (bool)$redis->exists($key);
         $this->assertFalse($exists);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals('build', $from);
 
         $data = $cache->get();
         $this->assertNull($data);
         $exists = (bool)$redis->exists($key);
         $this->assertFalse($exists);
-        $from = $cache->getDataFrom();
+        $from = $cache->getSource();
         $this->assertEquals('build', $from);
     }
 
@@ -391,16 +391,16 @@ class CacheHubTest extends TestCase
 
         $data = $cache->get();
         $this->assertEquals('test_1', $data);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals('build', $from);
         $cacheData = $redis->get($key);
         $this->assertEquals('cachehub_json:{"cachehub_version":1,"data":"test_1"}', $cacheData);
 
         $data = $cache->get();
         $this->assertEquals('test_1', $data);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals(RedisDriver::class, $from);
         $cacheData = $redis->get($key);
         $this->assertEquals('cachehub_json:{"cachehub_version":1,"data":"test_1"}', $cacheData);
@@ -411,16 +411,16 @@ class CacheHubTest extends TestCase
         };
         $data = $cache->get();
         $this->assertEquals('test_2', $data);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals('build', $from);
         $cacheData = $redis->get($key);
         $this->assertEquals('cachehub_json:{"cachehub_version":2,"data":"test_2"}', $cacheData);
 
         $data = $cache->get();
         $this->assertEquals('test_2', $data);
-        $from = $cache->getDataFrom();
-        $cache->clearDataFrom();
+        $from = $cache->getSource();
+        $cache->clearSource();
         $this->assertEquals(RedisDriver::class, $from);
         $cacheData = $redis->get($key);
         $this->assertEquals('cachehub_json:{"cachehub_version":2,"data":"test_2"}', $cacheData);
@@ -468,9 +468,9 @@ class CacheHubTest extends TestCase
                     $data = $cache->get();
                     $this->assertEquals('test_lock_wrap', $data);
                     // usleep(1);
-                    $from = $cache->getDataFrom();
+                    $from = $cache->getSource();
                     $fromArr[] = $from;
-                    $cache->clearDataFrom();
+                    $cache->clearSource();
                     $wg->done();
                 });
             }
@@ -507,9 +507,9 @@ class CacheHubTest extends TestCase
                     };
                     $cache->get();
                     // usleep(1);
-                    $from = $cache->getDataFrom();
+                    $from = $cache->getSource();
                     $fromArr[] = $from;
-                    $cache->clearDataFrom();
+                    $cache->clearSource();
                     $wg->done();
                 });
             }
@@ -546,9 +546,9 @@ class CacheHubTest extends TestCase
                     };
                     $cache->get();
                     // usleep(1);
-                    $from = $cache->getDataFrom();
+                    $from = $cache->getSource();
                     $fromArr[] = $from;
-                    $cache->clearDataFrom();
+                    $cache->clearSource();
                     $wg->done();
                 });
             }
@@ -587,9 +587,9 @@ class CacheHubTest extends TestCase
                         };
                         $cache->get();
                         // usleep(1);
-                        $from = $cache->getDataFrom();
+                        $from = $cache->getSource();
                         $fromArr[] = $from;
-                        $cache->clearDataFrom();
+                        $cache->clearSource();
                     } catch (\Exception $e) {
                         if ($e->getMessage() == 'build data timeout') {
                             $isTimeout++;

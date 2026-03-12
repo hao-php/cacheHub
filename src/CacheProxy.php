@@ -11,7 +11,7 @@ class CacheProxy
     private AbstractMultiCache $cache;
 
     /** @var string|array 数据来源 */
-    private $dataFrom = [];
+    private $source = [];
 
     public function __construct(CacheEngine $engine, AbstractMultiCache $cache)
     {
@@ -22,14 +22,14 @@ class CacheProxy
     public function get($keyParams = '', $refresh = false)
     {
         $result = $this->engine->get($this->cache, $keyParams, $refresh);
-        $this->dataFrom = $result['dataFrom'];
+        $this->source = $result['source'];
         return $result['data'];
     }
 
     public function multiGet(array $keyParamsArr): array
     {
         $result = $this->engine->multiGet($this->cache, $keyParamsArr);
-        $this->dataFrom = $result['dataFrom'];
+        $this->source = $result['source'];
         return $result['data'];
     }
 
@@ -38,14 +38,14 @@ class CacheProxy
         return $this->engine->update($this->cache, $keyParams);
     }
 
-    public function getDataFrom(): string|array
+    public function getSource(): string|array
     {
-        return $this->dataFrom;
+        return $this->source;
     }
 
-    public function clearDataFrom()
+    public function clearSource()
     {
-        $this->dataFrom = [];
+        $this->source = [];
     }
 
     public function getConfig(): AbstractMultiCache

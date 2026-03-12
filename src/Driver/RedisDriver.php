@@ -16,7 +16,7 @@ class RedisDriver extends AbstractDriver
     public function get($key)
     {
         $value = $this->handler->get($key);
-        if (Utils::checkEmpty($value)) {
+        if (Utils::isMiss($value)) {
             return null;
         }
         return $this->serializer->decode($value);
@@ -36,7 +36,7 @@ class RedisDriver extends AbstractDriver
     public function set($key, $value, $ttl = null): bool
     {
         $value = $this->serializer->encode($value);
-        if (Utils::checkEmpty($value)) {
+        if (Utils::isMiss($value)) {
             return false;
         }
         return (bool)$this->handler->setex($key, $ttl, $value);

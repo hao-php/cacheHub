@@ -20,7 +20,7 @@ class ApcuDriver extends AbstractDriver
     public function get($key)
     {
         $value = apcu_fetch($key);
-        if (Utils::checkEmpty($value)) {
+        if (Utils::isMiss($value)) {
             return null;
         }
         return $this->serializer->decode($value);
@@ -31,7 +31,7 @@ class ApcuDriver extends AbstractDriver
         $data = [];
         foreach ($keyArr as $key) {
             $value = apcu_fetch($key);
-            if (Utils::checkEmpty($value)) {
+            if (Utils::isMiss($value)) {
                 $data[$key] = null;
             } else {
                 $data[$key] = $this->serializer->decode($value);
@@ -43,7 +43,7 @@ class ApcuDriver extends AbstractDriver
     public function set($key, $value, $ttl = null): bool
     {
         $value = $this->serializer->encode($value);
-        if (Utils::checkEmpty($value)) {
+        if (Utils::isMiss($value)) {
             return false;
         }
         return (bool)apcu_store($key, $value, (int)$ttl);
@@ -53,7 +53,7 @@ class ApcuDriver extends AbstractDriver
     {
         foreach ($params as $key => $value) {
             $value = $this->serializer->encode($value);
-            if (!Utils::checkEmpty($value)) {
+            if (!Utils::isMiss($value)) {
                 apcu_store($key, $value, $ttl);
             }
         }

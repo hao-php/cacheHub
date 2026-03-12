@@ -6,7 +6,10 @@ namespace Haoa\CacheHub\Common;
 class Utils
 {
 
-    public static function checkEmpty($data)
+    /**
+     * 判断缓存取值是否未命中（null 或 false）
+     */
+    public static function isMiss($data)
     {
         return (is_null($data) || false === $data);
     }

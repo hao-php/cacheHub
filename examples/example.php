@@ -115,26 +115,26 @@ class AppCacheHub
 
         // 批量获取数据
         $data = $cache->multiGet(['test_1', 'test_2']);
-        $from = $cache->getDataFrom();
+        $from = $cache->getSource();
         var_dump($data, $from);
 
         apcu_delete('ex:ex_test:test_1');
 
         $data = $cache->multiGet(['test_1', 'test_2']);
-        $from = $cache->getDataFrom();
+        $from = $cache->getSource();
         var_dump($data, $from);
         //
         // $data = $cache->multiGet(['test_1', 'test_2']);
-        // $from = $cache->getDataFrom();
+        // $from = $cache->getSource();
         // var_dump($data, $from);
 
         // 获取数据
         // $data = $cache->get();
-        // $from = $cache->getDataFrom();
+        // $from = $cache->getSource();
         // var_dump($data, $from);
         //
         // $data = $cache->get();
-        // $from = $cache->getDataFrom();
+        // $from = $cache->getSource();
         // var_dump($data, $from);
 
         // 强制刷新, 获取数据

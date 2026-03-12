@@ -14,7 +14,7 @@ class CacheHub
     const DEFAULT_NULL_TTL = 60;
 
     /** @var CacheProxy[] */
-    protected $cacheObjs = [];
+    protected $caches = [];
 
     /** @var LockInterface|null 用于构建缓存时的锁 */
     protected $locker;
@@ -65,17 +65,17 @@ class CacheHub
         return $this->engine;
     }
 
-    public function getCache(string $cacheClass, bool $isNew = false): CacheProxy
+    public function getCache(string $cacheClass, bool $fresh = false): CacheProxy
     {
-        if (!$isNew && isset($this->cacheObjs[$cacheClass])) {
-            return $this->cacheObjs[$cacheClass];
+        if (!$fresh && isset($this->caches[$cacheClass])) {
+            return $this->caches[$cacheClass];
         }
         $cache = new $cacheClass;
         if (!$cache instanceof AbstractMultiCache) {
             throw new CacheException("{$cacheClass} must be of type " . AbstractMultiCache::class);
         }
         $proxy = new CacheProxy($this->getEngine(), $cache);
-        $this->cacheObjs[$cacheClass] = $proxy;
+        $this->caches[$cacheClass] = $proxy;
         return $proxy;
     }
 
