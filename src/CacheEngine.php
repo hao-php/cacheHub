@@ -324,9 +324,9 @@ class CacheEngine
             $pw = $pendingWrites[$i];
             $ret = $this->saveBuildResult($cache, $pw['driver'], $pw['key'], $data, $pw['ttl'], $pw['nullTtl']);
             if (!$ret) {
-                $this->logger and $this->logger->error("key:{$pw['key']}, {$pw['driver_class']} fail to set");
+                $this->logger and $this->logger->error("[get] key:{$pw['key']}, driver:{$pw['driver_class']}, failed to set");
             } else {
-                $this->logger and $this->logger->debug("key:{$pw['key']}, {$pw['driver_class']} set successfully");
+                $this->logger and $this->logger->debug("[get] key:{$pw['key']}, driver:{$pw['driver_class']}, set successfully");
             }
         }
 
@@ -438,10 +438,10 @@ class CacheEngine
             $key = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
             $ret = $this->saveBuildResult($cache, $driver, $key, $data, $level->ttl, $level->nullTtl);
             if (!$ret) {
-                $this->logger and $this->logger->error("key:{$key}, " . $level->driver . " fail to set");
+                $this->logger and $this->logger->error("[update] key:{$key}, driver:{$level->driver}, failed to set");
             } else {
                 $successNum++;
-                $this->logger and $this->logger->debug("key:{$key}, " . $level->driver . " set successfully");
+                $this->logger and $this->logger->debug("[update] key:{$key}, driver:{$level->driver}, set successfully");
             }
         }
 
