@@ -18,7 +18,7 @@ interface LockInterface
      * @param string $key 键
      * @return bool
      */
-    public function unLock(string $key): bool;
+    public function unlock(string $key): bool;
 
     /**
      * @param string $key 键

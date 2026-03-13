@@ -51,10 +51,8 @@ class RawSerializerTest extends TestCase
     /** RawSerializer 应原样存储字符串，不添加 JSON 包装 */
     public function testRawSerializerStoresPlainString()
     {
-        $cacheHub = new CacheHub();
-        $cacheHub->setPrefix('unit_test:');
-        $locker = new \Haoa\CacheHub\Locker\RedisLock($this->redis);
-        $cacheHub->setLocker($locker);
+        $lock = new \Haoa\CacheHub\Locker\RedisLock($this->redis);
+        $cacheHub = new CacheHub($lock, 'unit_test:');
 
         $cache = $cacheHub->getCache(RawSerializerCache::class);
         $cache->key = 'test_raw';
@@ -73,10 +71,8 @@ class RawSerializerTest extends TestCase
     /** RawSerializer 应正确处理非字符串数据（Redis 会自动序列化对象/数组） */
     public function testRawSerializerWithArrayData()
     {
-        $cacheHub = new CacheHub();
-        $cacheHub->setPrefix('unit_test:');
-        $locker = new \Haoa\CacheHub\Locker\RedisLock($this->redis);
-        $cacheHub->setLocker($locker);
+        $lock = new \Haoa\CacheHub\Locker\RedisLock($this->redis);
+        $cacheHub = new CacheHub($lock, 'unit_test:');
 
         $cache = $cacheHub->getCache(RawSerializerCache::class);
         $cache->key = 'test_raw_array';

@@ -21,7 +21,7 @@ class RedisLock implements LockInterface
         return $this->redis->set($key, $value, ['nx', 'ex' => $expire]);
     }
 
-    public function unLock(string $key): bool
+    public function unlock(string $key): bool
     {
         return (bool)$this->redis->del($key);
     }

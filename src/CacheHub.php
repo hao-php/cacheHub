@@ -5,6 +5,7 @@ namespace Haoa\CacheHub;
 
 use Haoa\CacheHub\Exception\CacheException;
 use Haoa\CacheHub\Locker\LockInterface;
+use Psr\Log\LoggerInterface;
 
 class CacheHub
 {
@@ -16,17 +17,15 @@ class CacheHub
     /** @var CacheProxy[] */
     protected $caches = [];
 
-    /** @var LockInterface|null 用于构建缓存时的锁 */
-    protected $locker;
-
-    /** @var LoggerInterface|null */
-    protected $logger;
-
-    /** 缓存前缀 */
-    protected $prefix = 'cachehub:';
-
     private ?CacheEngine $engine = null;
 
+    public function __construct(
+        /** 用于构建缓存时的锁 */
+        protected LockInterface $lock,
+        /** 缓存前缀 */
+        protected string $prefix = 'cachehub:',
+        protected ?LoggerInterface $logger = null,
+    ) {}
 
     /**
      * @return string
@@ -36,31 +35,10 @@ class CacheHub
         return $this->prefix;
     }
 
-    /**
-     * @param string $prefix
-     */
-    public function setPrefix(string $prefix): void
-    {
-        $this->prefix = $prefix;
-        $this->engine = null;
-    }
-
-    public function setLocker(LockInterface $locker)
-    {
-        $this->locker = $locker;
-        $this->engine = null;
-    }
-
-    public function setLogger(LoggerInterface $logger)
-    {
-        $this->logger = $logger;
-        $this->engine = null;
-    }
-
     protected function getEngine(): CacheEngine
     {
         if ($this->engine === null) {
-            $this->engine = new CacheEngine($this->locker, $this->prefix, $this->logger);
+            $this->engine = new CacheEngine($this->lock, $this->prefix, $this->logger);
         }
         return $this->engine;
     }

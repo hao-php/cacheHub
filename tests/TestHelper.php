@@ -32,10 +32,8 @@ class TestHelper
             $redis = self::getRedis();
         }
 
-        $cacheHub = new CacheHub();
-        $cacheHub->setPrefix('unit_test:');
-        $locker = new RedisLock($redis);
-        $cacheHub->setLocker($locker);
+        $lock = new RedisLock($redis);
+        $cacheHub = new CacheHub($lock, 'unit_test:');
         return $cacheHub;
     }
 

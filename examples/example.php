@@ -94,15 +94,9 @@ class AppCacheHub
         $redis->connect('redis');
         $redis->select(3);
 
-        $cacheHub = new CacheHub();
-
-        // 设置key的前缀
-        $cacheHub->setPrefix('ex:');
-
         // 注入redis锁
-        $locker = new RedisLock($redis);
-        $cacheHub->setLocker($locker);
-        $cacheHub->setLogger(new Logger());
+        $lock = new RedisLock($redis);
+        $cacheHub = new CacheHub($lock, 'ex:', new Logger());
 
         return $cacheHub;
     }

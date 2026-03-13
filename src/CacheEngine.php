@@ -8,12 +8,13 @@ use Haoa\CacheHub\Driver\AbstractDriver;
 use Haoa\CacheHub\Exception\CacheException;
 use Haoa\CacheHub\Locker\LockInterface;
 use Haoa\CacheHub\Serializer\SerializerInterface;
+use Psr\Log\LoggerInterface;
 
 class CacheEngine
 {
 
     /** @var LockInterface|null */
-    protected $locker;
+    protected $lock;
 
     protected string $prefix;
 
@@ -23,9 +24,9 @@ class CacheEngine
 
     protected array $serializers = [];
 
-    public function __construct($locker, string $prefix, ?LoggerInterface $logger = null)
+    public function __construct($lock, string $prefix, ?LoggerInterface $logger = null)
     {
-        $this->locker = $locker;
+        $this->lock = $lock;
         $this->prefix = $prefix;
         $this->logger = $logger;
     }
@@ -231,15 +232,15 @@ class CacheEngine
         if (!$cache->lockEnabled || $cache->lockRetryCount <= 0) {
             return [false, null];
         }
-        if (empty($this->locker)) {
-            throw new CacheException('locker is empty');
+        if (empty($this->lock)) {
+            throw new CacheException('lock is empty');
         }
         $lockKey = $this->makeLockKey($this->prefix, $this->getKey($cache), $keyParams);
         $lockExpireTime = (int)round($cache->lockRetryCount * $cache->lockRetryInterval / 1000) + 10;
 
-        if ($this->locker->tryLock($lockKey, 1, $lockExpireTime)) {
+        if ($this->lock->tryLock($lockKey, 1, $lockExpireTime)) {
             Utils::scopeDefer($stack, function () use ($lockKey) {
-                $this->locker->unLock($lockKey);
+                $this->lock->unlock($lockKey);
             });
             return [false, null];
         }
@@ -254,7 +255,7 @@ class CacheEngine
                 return [true, $data];
             }
 
-            if (!$this->locker->isLocked($lockKey)) {
+            if (!$this->lock->isLocked($lockKey)) {
                 return [false, null];
             }
         }
