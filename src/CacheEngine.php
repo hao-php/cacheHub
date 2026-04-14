@@ -269,40 +269,55 @@ class CacheEngine
 
     /**
      * 获取缓存数据，未命中时自动 build 并回写
+     * @param int $skipLevels 跳过前面几级缓存，0=不跳过，等于层级数时直接走 build
      * @return array{data: mixed, source: string}
      */
-    public function get(AbstractMultiCache $cache, $keyParams = '', $refresh = false): array
+    public function get(AbstractMultiCache $cache, $keyParams = '', int $skipLevels = 0): array
     {
         $levels = $cache->getLevels();
         $this->validateLevels($levels);
-        $pendingWrites = [];
         $len = count($levels);
-        $index = 0;
         $data = null;
         $hit = false;
         $source = '';
 
-        foreach ($levels as $level) {
-            $index++;
+        // 跳过的层级需要回写，先构建跳过的层级列表
+        $startIndex = min($skipLevels, $len);
+        $skippedWrites = [];
+        for ($i = 0; $i < $startIndex; $i++) {
+            $level = $levels[$i];
+            $driver = $this->getDriver($level);
+            $key = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
+            $skippedWrites[] = [
+                'driver_class' => $level->driver,
+                'driver' => $driver,
+                'key' => $key,
+                'ttl' => $level->ttl,
+                'nullTtl' => $level->nullTtl,
+            ];
+        }
+
+        // 从 startIndex 开始遍历，检查缓存
+        $pendingWrites = [];
+        for ($i = $startIndex; $i < $len; $i++) {
+            $level = $levels[$i];
             $driver = $this->getDriver($level);
             $key = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
 
-            if (!$refresh) {
-                $data = $driver->get($key);
-                list($hit, $data) = $this->resolveCacheData($cache, $data);
+            $data = $driver->get($key);
+            list($hit, $data) = $this->resolveCacheData($cache, $data);
+            if ($hit) {
+                $source = $level->driver;
+                break;
+            }
+
+            // 最后一级缓存，尝试加锁
+            if ($i == $len - 1 && $driver->canLock()) {
+                $stack = new \SplStack();
+                list($hit, $data) = $this->tryLockAndWait($cache, $driver, $key, $keyParams, $stack);
                 if ($hit) {
                     $source = $level->driver;
                     break;
-                }
-
-                // 最后一级缓存，尝试加锁
-                if ($index == $len && $driver->canLock()) {
-                    $stack = new \SplStack();
-                    list($hit, $data) = $this->tryLockAndWait($cache, $driver, $key, $keyParams, $stack);
-                    if ($hit) {
-                        $source = $level->driver;
-                        break;
-                    }
                 }
             }
 
@@ -314,6 +329,9 @@ class CacheEngine
                 'nullTtl' => $level->nullTtl,
             ];
         }
+
+        // 合并：跳过的层级在前面，保证回写顺序正确（从最后一级往前）
+        $pendingWrites = array_merge($skippedWrites, $pendingWrites);
 
         if (!$hit) {
             $data = $cache->build($keyParams);

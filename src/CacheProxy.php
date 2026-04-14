@@ -19,9 +19,9 @@ class CacheProxy
         $this->cache = $cache;
     }
 
-    public function get($keyParams = '', $refresh = false)
+    public function get($keyParams = '', int $skipLevels = 0)
     {
-        $result = $this->engine->get($this->cache, $keyParams, $refresh);
+        $result = $this->engine->get($this->cache, $keyParams, $skipLevels);
         $this->source = $result['source'];
         return $result['data'];
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/autoload.php';
 
+use Haoa\CacheHub\Driver\ApcuDriver;
 use Haoa\CacheHub\Driver\RedisDriver;
 use PHPUnit\Framework\TestCase;
 
@@ -56,7 +57,7 @@ class GetTest extends TestCase
         $this->assertEquals(RedisDriver::class, $cache->getSource());
     }
 
-    /** refresh=true 应该强制走 build */
+    /** skipLevels=层级数 应跳过所有缓存，直接走 build */
     public function testGetWithRefresh()
     {
         $cacheHub = TestHelper::getCacheHub();
@@ -69,7 +70,8 @@ class GetTest extends TestCase
         $cache->get();
         $cache->clearSource();
 
-        $data = $cache->get('', true);
+        // 单级缓存，skipLevels=1 跳过所有层级，直接走 build
+        $data = $cache->get('', 1);
         $this->assertEquals('hello', $data);
         $this->assertEquals('build', $cache->getSource());
     }
@@ -131,6 +133,57 @@ class GetTest extends TestCase
         $data = $cache->get();
         $this->assertEquals(['name' => 'test', 'id' => 1], $data);
         $this->assertEquals(RedisDriver::class, $cache->getSource());
+    }
+
+    /** skipLevels=1 应跳过第一级缓存，直接从第二级读取 */
+    public function testGetWithSkipLevels()
+    {
+        $cacheHub = TestHelper::getCacheHub();
+        $cache = $cacheHub->getCache(MultiLevelCache::class);
+        $cache->key = 'test_skip_levels';
+        $cache->valueFunc = function ($params) {
+            return 'data';
+        };
+
+        // 第一次 get 走 build，写入 APCu + Redis
+        $cache->get();
+        $this->assertEquals('build', $cache->getSource());
+
+        // 第二次 get 从 APCu 命中
+        $cache->clearSource();
+        $cache->get();
+        $this->assertEquals(ApcuDriver::class, $cache->getSource());
+
+        // skipLevels=1 跳过 APCu，直接从 Redis 读取
+        $cache->clearSource();
+        $data = $cache->get('', 1);
+        $this->assertEquals('data', $data);
+        $this->assertEquals(RedisDriver::class, $cache->getSource());
+    }
+
+    /** skipLevels 后未命中，build 数据应回写到所有层级（包括跳过的） */
+    public function testGetWithSkipLevelsWriteBack()
+    {
+        $cacheHub = TestHelper::getCacheHub();
+        $cache = $cacheHub->getCache(MultiLevelCache::class);
+        $cache->key = 'test_skip_levels_write';
+
+        // APCu 有旧数据，Redis 无数据
+        $apcuKey = 'unit_test:test_skip_levels_write';
+        apcu_store($apcuKey, 'old_data', 60);
+
+        // skipLevels=1 跳过 APCu，Redis 未命中，触发 build
+        $cache->valueFunc = function ($params) {
+            return 'new_data';
+        };
+        $data = $cache->get('', 1);
+        $this->assertEquals('new_data', $data);
+        $this->assertEquals('build', $cache->getSource());
+
+        // build 数据应回写到 APCu（覆盖旧数据）和 Redis
+        $this->assertEquals('new_data', apcu_fetch($apcuKey));
+        $redisKey = 'unit_test:test_skip_levels_write';
+        $this->assertEquals('new_data', TestHelper::getRedis()->get($redisKey));
     }
 
     /** 单级缓存应支持 delete 方法 */
