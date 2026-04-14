@@ -1,5 +1,5 @@
 {
-    "name": "haoa/cachehub",
+    "name": "haoa/cacheHub",
     "autoload": {
         "psr-4": {
             "Haoa\\CacheHub\\": "src/"
