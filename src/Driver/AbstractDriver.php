@@ -27,7 +27,8 @@ abstract class AbstractDriver
 
     abstract public function multiSet(array $items, int $ttl): bool;
 
-    abstract public function multiDelete(array $keys);
+    /** @return int 删除成功的数量 */
+    abstract public function multiDelete(array $keys): int;
 
     /** 构建最终的缓存 key */
     public function makeKey(string $prefix, string $key, $keyParams = ''): string

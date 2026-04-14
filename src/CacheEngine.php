@@ -450,15 +450,57 @@ class CacheEngine
 
     /**
      * 当只有单级缓存时，透传驱动方法
+     * 注意：$arguments[0] 应为 keyParams，会自动转换为完整 cache key
      */
     public function callDriverMethod(AbstractMultiCache $cache, string $name, array $arguments)
     {
         $levels = $cache->getLevels();
         if (count($levels) == 1) {
             $driver = $this->getDriver($levels[0]);
+            $keyParams = $arguments[0] ?? '';
+            $arguments[0] = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
             return call_user_func_array([$driver, $name], $arguments);
         }
         throw new CacheException("{$name} is unsupported");
+    }
+
+    /**
+     * 删除缓存：从所有层级逐级删除
+     * @return int 成功删除的层级数
+     */
+    public function delete(AbstractMultiCache $cache, $keyParams = ''): int
+    {
+        $levels = $cache->getLevels();
+        $this->validateLevels($levels);
+        $successNum = 0;
+        foreach ($levels as $level) {
+            $driver = $this->getDriver($level);
+            $key = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
+            if ($driver->delete($key)) {
+                $successNum++;
+            }
+        }
+        return $successNum;
+    }
+
+    /**
+     * 批量删除缓存：从所有层级逐级删除
+     * @return array 每个层级成功删除的数量
+     */
+    public function multiDelete(AbstractMultiCache $cache, array $keyParamsArr): array
+    {
+        $levels = $cache->getLevels();
+        $this->validateLevels($levels);
+        $result = [];
+        foreach ($levels as $level) {
+            $driver = $this->getDriver($level);
+            $keys = [];
+            foreach ($keyParamsArr as $keyParams) {
+                $keys[] = $driver->makeKey($this->prefix, $this->getKey($cache), $keyParams);
+            }
+            $result[$level->driver] = $driver->multiDelete($keys);
+        }
+        return $result;
     }
 
 }

@@ -22,6 +22,9 @@ class TestHelper
 
         $redis = new Redis();
         $redis->connect($redisConfig['host'], $redisConfig['port']);
+        if (!empty($redisConfig['password'])) {
+            $redis->auth($redisConfig['password']);
+        }
         $redis->select($redisConfig['db']);
         return $redis;
     }

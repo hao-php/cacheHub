@@ -58,9 +58,9 @@ class RedisDriver extends AbstractDriver
         return (bool)$this->handler->del($key);
     }
 
-    public function multiDelete(array $keys)
+    public function multiDelete(array $keys): int
     {
-        return $this->handler->del(...$keys);
+        return (int)$this->handler->del(...$keys);
     }
 
 }

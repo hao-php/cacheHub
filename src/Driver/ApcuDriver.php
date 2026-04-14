@@ -65,8 +65,10 @@ class ApcuDriver extends AbstractDriver
         return (bool)apcu_delete($key);
     }
 
-    public function multiDelete(array $keys)
+    public function multiDelete(array $keys): int
     {
-        return apcu_delete($keys);
+        $failed = apcu_delete($keys);
+        // apcu_delete 返回删除失败的 key 数组
+        return count($keys) - count($failed);
     }
 }

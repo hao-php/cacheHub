@@ -38,6 +38,16 @@ class CacheProxy
         return $this->engine->update($this->cache, $keyParams);
     }
 
+    public function delete($keyParams = ''): int
+    {
+        return $this->engine->delete($this->cache, $keyParams);
+    }
+
+    public function multiDelete(array $keyParamsArr): array
+    {
+        return $this->engine->multiDelete($this->cache, $keyParamsArr);
+    }
+
     public function getSource(): string|array
     {
         return $this->source;
