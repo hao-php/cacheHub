@@ -21,8 +21,8 @@ abstract class AbstractCache
     /** 数据版本号，当 versioned=true 时生效 */
     public $version = 1;
 
-    /** 是否在 build 时加锁，防止并发重复构建 */
-    public $lockEnabled = false;
+    /** 是否在 build 时加锁，默认开启，防止并发重复构建 */
+    public $lockEnabled = true;
 
     /** 加锁等待重试次数 */
     public $lockRetryCount = 3;

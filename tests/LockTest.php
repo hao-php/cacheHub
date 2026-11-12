@@ -21,7 +21,7 @@ class LockTest extends TestCase
         apcu_clear_cache();
     }
 
-    /** 开启锁时，并发请求只有 1 个走 build，其余从缓存获取 */
+    /** 默认开启锁，并发请求只有 1 个走 build，其余从缓存获取 */
     public function testLockOnlyOneBuild()
     {
         $cacheHub = TestHelper::getCacheHub($this->redis);
@@ -33,7 +33,6 @@ class LockTest extends TestCase
             for ($i = 0; $i < 5; $i++) {
                 \Swoole\Coroutine::create(function () use ($wg, &$sourceArr, $cacheHub) {
                     $cache = $cacheHub->getCache(MultiLevelCache::class, true);
-                    $cache->lockEnabled = true;
                     $cache->lockTimeoutMode = 1;
                     $cache->lockRetryInterval = 10;
                     $cache->lockRetryCount = 5;
