@@ -21,9 +21,16 @@ class RedisLock implements LockInterface
         return $this->redis->set($key, $value, ['nx', 'ex' => $expire]);
     }
 
-    public function unlock(string $key): bool
+    public function unlock(string $key, string $token): bool
     {
-        return (bool)$this->redis->del($key);
+        // 原子校验所有权，避免删除锁过期后其他请求重新获取的锁。
+        $script = <<<'LUA'
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('del', KEYS[1])
+end
+return 0
+LUA;
+        return (bool)$this->redis->eval($script, [$key, $token], 1);
     }
 
     public function isLocked(string $key): bool

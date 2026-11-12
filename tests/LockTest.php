@@ -159,4 +159,30 @@ class LockTest extends TestCase
         $this->assertEquals(1, $timeoutCount);
     }
 
+    /** 只有匹配本次获取锁的标识才能解锁。 */
+    public function testUnlockRequiresOwnership(): void
+    {
+        $lock = new \Haoa\CacheHub\Locker\RedisLock($this->redis);
+        $key = 'unit_test:lock:ownership';
+        $this->assertTrue($lock->tryLock($key, 'owner-a', 30));
+        $this->assertFalse($lock->unlock($key, 'owner-b'));
+        $this->assertSame('owner-a', $this->redis->get($key));
+        $this->assertTrue($lock->unlock($key, 'owner-a'));
+        $this->assertFalse($lock->unlock($key, 'owner-a'));
+    }
+
+    /** 模拟旧锁到期后重新获取，旧持有者不能删除新锁。 */
+    public function testPreviousOwnerCannotUnlockNewLock(): void
+    {
+        $lock = new \Haoa\CacheHub\Locker\RedisLock($this->redis);
+        $key = 'unit_test:lock:reacquired';
+        $this->assertTrue($lock->tryLock($key, 'old-owner', 30));
+        // 删除旧锁，确定性模拟 Redis 自动过期，避免依赖等待时间。
+        $this->redis->del($key);
+        $this->assertTrue($lock->tryLock($key, 'new-owner', 30));
+        $this->assertFalse($lock->unlock($key, 'old-owner'));
+        $this->assertSame('new-owner', $this->redis->get($key));
+        $this->assertTrue($lock->unlock($key, 'new-owner'));
+    }
+
 }

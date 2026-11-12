@@ -49,8 +49,8 @@ class CacheHub
             return $this->caches[$cacheClass];
         }
         $cache = new $cacheClass;
-        if (!$cache instanceof AbstractMultiCache) {
-            throw new CacheException("{$cacheClass} must be of type " . AbstractMultiCache::class);
+        if (!$cache instanceof AbstractCache) {
+            throw new CacheException("{$cacheClass} must be of type " . AbstractCache::class);
         }
         $proxy = new CacheProxy($this->getEngine(), $cache);
         $this->caches[$cacheClass] = $proxy;

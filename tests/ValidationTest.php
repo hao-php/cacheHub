@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/autoload.php';
 
-use Haoa\CacheHub\AbstractMultiCache;
+use Haoa\CacheHub\AbstractCache;
 use Haoa\CacheHub\CacheLevel;
 use Haoa\CacheHub\Driver\ApcuDriver;
 use Haoa\CacheHub\Exception\CacheException;
@@ -28,7 +28,7 @@ class ValidationTest extends TestCase
     /** levels 中配置重复 driver 时应抛出异常 */
     public function testDuplicateDriverThrows()
     {
-        $duplicateCache = new class extends AbstractMultiCache {
+        $duplicateCache = new class extends AbstractCache {
             public $key = 'test_dup';
 
             public function getLevels(): array
@@ -57,7 +57,7 @@ class ValidationTest extends TestCase
         $engine->get($duplicateCache);
     }
 
-    /** getCache 传入非 AbstractMultiCache 子类应抛出异常 */
+    /** getCache 传入非 AbstractCache 子类应抛出异常 */
     public function testInvalidCacheClassThrows()
     {
         $cacheHub = TestHelper::getCacheHub();
@@ -81,7 +81,7 @@ class ValidationTest extends TestCase
     /** levels 为空时应抛出异常 */
     public function testEmptyLevelsThrows()
     {
-        $emptyLevelsCache = new class extends AbstractMultiCache {
+        $emptyLevelsCache = new class extends AbstractCache {
             public $key = 'test_empty_levels';
 
             public function getLevels(): array

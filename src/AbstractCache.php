@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Haoa\CacheHub;
 
-abstract class AbstractMultiCache
+abstract class AbstractCache
 {
 
     /** 缓存key */

@@ -16,9 +16,10 @@ interface LockInterface
 
     /**
      * @param string $key 键
-     * @return bool
+     * @param string $token 本次获取锁时使用的唯一标识
+     * @return bool 是否成功释放自己持有的锁
      */
-    public function unlock(string $key): bool;
+    public function unlock(string $key, string $token): bool;
 
     /**
      * @param string $key 键

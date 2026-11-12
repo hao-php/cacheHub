@@ -85,7 +85,7 @@ class CacheEngine
      * 获取缓存 key，为空时抛出异常
      * @return string
      */
-    protected function getKey(AbstractMultiCache $cache): string
+    protected function getKey(AbstractCache $cache): string
     {
         if (empty($cache->key)) {
             throw new CacheException("key is empty");
@@ -128,11 +128,11 @@ class CacheEngine
 
     /**
      * 校验并剥离版本号包装，版本不匹配则视为未命中
-     * @param AbstractMultiCache $cache
+     * @param AbstractCache $cache
      * @param mixed &$data 校验通过后会剥离版本包装，只保留原始数据
      * @return bool
      */
-    protected function stripDataVersion(AbstractMultiCache $cache, &$data)
+    protected function stripDataVersion(AbstractCache $cache, &$data)
     {
         if (!$cache->versioned) {
             return true;
@@ -146,11 +146,11 @@ class CacheEngine
 
     /**
      * 给数据包装版本号
-     * @param AbstractMultiCache $cache
+     * @param AbstractCache $cache
      * @param mixed $data 原始数据
      * @return mixed 包装后的数据，或未开启版本时返回原数据
      */
-    protected function wrapDataVersion(AbstractMultiCache $cache, $data)
+    protected function wrapDataVersion(AbstractCache $cache, $data)
     {
         if (!$cache->versioned) {
             return $data;
@@ -165,7 +165,7 @@ class CacheEngine
      * 将空值标记（nullValue）写入缓存，防止缓存穿透
      * @return bool
      */
-    protected function cacheNullValue(AbstractMultiCache $cache, AbstractDriver $driver, $key, int $nullTtl)
+    protected function cacheNullValue(AbstractCache $cache, AbstractDriver $driver, $key, int $nullTtl)
     {
         if (!$cache->cacheNull) {
             return true;
@@ -178,22 +178,22 @@ class CacheEngine
 
     /**
      * 判断缓存值是否为空值标记（nullValue）
-     * @param AbstractMultiCache $cache
+     * @param AbstractCache $cache
      * @param mixed $value 从缓存取出的值
      * @return bool
      */
-    protected function isNullValue(AbstractMultiCache $cache, $value)
+    protected function isNullValue(AbstractCache $cache, $value)
     {
         return $value === $cache->nullValue;
     }
 
     /**
      * 解析缓存数据，判定命中状态
-     * @param AbstractMultiCache $cache
+     * @param AbstractCache $cache
      * @param mixed $data 从缓存取出的原始数据
      * @return array{0: bool, 1: mixed} [是否命中, 解析后的数据]
      */
-    protected function resolveCacheData(AbstractMultiCache $cache, $data)
+    protected function resolveCacheData(AbstractCache $cache, $data)
     {
         if (!$this->isEmptyData($data) && $this->stripDataVersion($cache, $data)) {
             return [true, $data];
@@ -210,7 +210,7 @@ class CacheEngine
      * 将 build 结果写入缓存，空数据则写入空值标记
      * @return bool
      */
-    protected function saveBuildResult(AbstractMultiCache $cache, AbstractDriver $driver, $key, $data, int $ttl, int $nullTtl)
+    protected function saveBuildResult(AbstractCache $cache, AbstractDriver $driver, $key, $data, int $ttl, int $nullTtl)
     {
         if ($this->isEmptyData($data)) {
             return $this->cacheNullValue($cache, $driver, $key, $nullTtl);
@@ -227,7 +227,7 @@ class CacheEngine
      * 加锁场景下尝试获取缓存数据：获取锁则放行 build，未获取锁则等待其他进程写入
      * @return array{0: bool, 1: mixed} [是否命中, 数据]
      */
-    protected function tryLockAndWait(AbstractMultiCache $cache, AbstractDriver $driver, $key, $keyParams, &$stack): array
+    protected function tryLockAndWait(AbstractCache $cache, AbstractDriver $driver, $key, $keyParams, &$stack): array
     {
         if (!$cache->lockEnabled || $cache->lockRetryCount <= 0) {
             return [false, null];
@@ -238,9 +238,10 @@ class CacheEngine
         $lockKey = $this->makeLockKey($this->prefix, $this->getKey($cache), $keyParams);
         $lockExpireTime = (int)round($cache->lockRetryCount * $cache->lockRetryInterval / 1000) + 10;
 
-        if ($this->lock->tryLock($lockKey, 1, $lockExpireTime)) {
-            Utils::scopeDefer($stack, function () use ($lockKey) {
-                $this->lock->unlock($lockKey);
+        $lockToken = bin2hex(random_bytes(16));
+        if ($this->lock->tryLock($lockKey, $lockToken, $lockExpireTime)) {
+            Utils::scopeDefer($stack, function () use ($lockKey, $lockToken) {
+                $this->lock->unlock($lockKey, $lockToken);
             });
             return [false, null];
         }
@@ -272,7 +273,7 @@ class CacheEngine
      * @param int $skipLevels 跳过前面几级缓存，0=不跳过，等于层级数时直接走 build
      * @return array{data: mixed, source: string}
      */
-    public function get(AbstractMultiCache $cache, $keyParams = '', int $skipLevels = 0): array
+    public function get(AbstractCache $cache, $keyParams = '', int $skipLevels = 0): array
     {
         $levels = $cache->getLevels();
         $this->validateLevels($levels);
@@ -355,7 +356,7 @@ class CacheEngine
      * 批量获取缓存数据，未命中的自动 multiBuild 并回写
      * @return array{data: array, source: array}
      */
-    public function multiGet(AbstractMultiCache $cache, array $keyParamsArr): array
+    public function multiGet(AbstractCache $cache, array $keyParamsArr): array
     {
         $levels = $cache->getLevels();
         $this->validateLevels($levels);
@@ -444,7 +445,7 @@ class CacheEngine
      * 主动更新缓存：重新 build 并写入所有层级
      * @return int 成功写入的层级数
      */
-    public function update(AbstractMultiCache $cache, $keyParams = ''): int
+    public function update(AbstractCache $cache, $keyParams = ''): int
     {
         $levels = $cache->getLevels();
         $this->validateLevels($levels);
@@ -470,7 +471,7 @@ class CacheEngine
      * 当只有单级缓存时，透传驱动方法
      * 注意：$arguments[0] 应为 keyParams，会自动转换为完整 cache key
      */
-    public function callDriverMethod(AbstractMultiCache $cache, string $name, array $arguments)
+    public function callDriverMethod(AbstractCache $cache, string $name, array $arguments)
     {
         $levels = $cache->getLevels();
         if (count($levels) == 1) {
@@ -486,7 +487,7 @@ class CacheEngine
      * 删除缓存：从所有层级逐级删除
      * @return int 成功删除的层级数
      */
-    public function delete(AbstractMultiCache $cache, $keyParams = ''): int
+    public function delete(AbstractCache $cache, $keyParams = ''): int
     {
         $levels = $cache->getLevels();
         $this->validateLevels($levels);
@@ -505,7 +506,7 @@ class CacheEngine
      * 批量删除缓存：从所有层级逐级删除
      * @return array 每个层级成功删除的数量
      */
-    public function multiDelete(AbstractMultiCache $cache, array $keyParamsArr): array
+    public function multiDelete(AbstractCache $cache, array $keyParamsArr): array
     {
         $levels = $cache->getLevels();
         $this->validateLevels($levels);

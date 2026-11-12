@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-use Haoa\CacheHub\AbstractMultiCache;
+use Haoa\CacheHub\AbstractCache;
 use Haoa\CacheHub\CacheLevel;
 use Haoa\CacheHub\Driver\ApcuDriver;
 use Haoa\CacheHub\Driver\RedisDriver;
@@ -10,7 +10,7 @@ use Haoa\CacheHub\Serializer\JsonSerializer;
 /**
  * 多级缓存（APCu + Redis），用于多级回写、批量操作等测试
  */
-class MultiLevelCache extends AbstractMultiCache
+class MultiLevelCache extends AbstractCache
 {
 
     public $key = 'test';

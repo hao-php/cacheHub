@@ -8,12 +8,12 @@ class CacheProxy
 
     private CacheEngine $engine;
 
-    private AbstractMultiCache $cache;
+    private AbstractCache $cache;
 
     /** @var string|array 数据来源 */
     private $source = [];
 
-    public function __construct(CacheEngine $engine, AbstractMultiCache $cache)
+    public function __construct(CacheEngine $engine, AbstractCache $cache)
     {
         $this->engine = $engine;
         $this->cache = $cache;
@@ -58,7 +58,7 @@ class CacheProxy
         $this->source = [];
     }
 
-    public function getConfig(): AbstractMultiCache
+    public function getConfig(): AbstractCache
     {
         return $this->cache;
     }

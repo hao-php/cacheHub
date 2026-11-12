@@ -1,6 +1,6 @@
 <?php
 
-use Haoa\CacheHub\AbstractMultiCache;
+use Haoa\CacheHub\AbstractCache;
 use Haoa\CacheHub\CacheHub;
 use Haoa\CacheHub\CacheLevel;
 use Haoa\CacheHub\Driver\ApcuDriver;
@@ -25,7 +25,7 @@ class Logger implements \Haoa\CacheHub\LoggerInterface
     }
 }
 
-class ExTest extends AbstractMultiCache
+class ExTest extends AbstractCache
 {
 
     public $key = "ex_test";

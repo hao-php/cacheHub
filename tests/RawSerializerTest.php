@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/autoload.php';
 
-use Haoa\CacheHub\AbstractMultiCache;
+use Haoa\CacheHub\AbstractCache;
 use Haoa\CacheHub\CacheHub;
 use Haoa\CacheHub\CacheLevel;
 use Haoa\CacheHub\Driver\RedisDriver;
@@ -14,7 +14,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * 使用 RawSerializer 的缓存类
  */
-class RawSerializerCache extends AbstractMultiCache
+class RawSerializerCache extends AbstractCache
 {
     public $key = 'test';
     public $valueFunc;
